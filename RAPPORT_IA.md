@@ -121,3 +121,57 @@ Le service `AuthService` existant retire déjà `gpc_token` du `localStorage` et
 - Vérifier dans le navigateur : connexion, ouverture du profil et `GET /api/users/me`; modification du nom et `PUT /api/users/me`; déconnexion et absence de `gpc_token` dans le stockage local.
 - Pour tester l'expiration sans attendre deux heures, envoyer une valeur JWT invalide ou expirée, provoquer une requête protégée, puis confirmer le `401`, le nettoyage de session et le retour à `/login`. Vérifier aussi qu'un mauvais mot de passe conserve le message de connexion au lieu d'être traité comme une session expirée.
 - Après modification, le build Angular reste à exécuter; ces vérifications navigateur ne sont pas déclarées comme réalisées tant qu'elles n'ont pas été faites.
+
+## Mission : routes backend, séparation des responsabilités et réflexion IA
+
+### Prompt principal
+
+« Vérifier que les composants n'appellent pas directement `HttpClient`, qu'ils passent par les services injectés avec `inject()`, et expliquer la séparation interface/service/API. Lister les routes backend effectivement utilisées par le frontend. Décrire précisément où s'effectue la mise à jour du profil utilisateur côté frontend et backend. Compléter le rapport avec les prompts, les points critiques à vérifier et une réflexion sur Copilot, Claude et la consommation de tokens. »
+
+### Séparation interface, service et API
+
+La recherche dans `frontend-starter/src/app/` confirme que `HttpClient` est injecté uniquement dans `AuthService` et `TrackService`, pas directement dans les composants. Les composants utilisent `inject(AuthService)` ou `inject(TrackService)`, puis appellent des méthodes du service. Le service construit la requête HTTP et l'API backend la traite.
+
+`inject(Type)` demande à Angular de fournir une dépendance depuis son système d'injection dans un contexte Angular valide, par exemple l'initialisation d'un champ ou d'un constructeur. Cela évite de créer soi-même un service avec `new`, conserve les services partagés déclarés avec `providedIn: 'root'` et facilite le remplacement par des doublures dans les tests. Ici, les composants injectent des services métier; seuls ces services injectent `HttpClient` pour accéder à l'API.
+
+### Routes backend utilisées par le frontend
+
+Toutes les URL ci-dessous sont préfixées par `/api`. Les appels sont centralisés dans `AuthService` et `TrackService`.
+
+| Méthode et route | Appel frontend | Accès et usage |
+|---|---|---|
+| `POST /auth/register` | `AuthService.register()` | Publique; crée un compte et renvoie le token et l'utilisateur. |
+| `POST /auth/login` | `AuthService.login()` | Publique; authentifie l'utilisateur et renvoie le token et l'utilisateur. |
+| `GET /users/me` | `AuthService.profile()` | Protégée; charge le profil de l'utilisateur connecté. |
+| `PUT /users/me` | `AuthService.update(name)` | Protégée; modifie le nom de l'utilisateur connecté. |
+| `GET /tracks?page=...&limit=...` | `TrackService.list()` | Protégée; charge une page de pistes. |
+| `POST /tracks` | `TrackService.upload()` | Protégée; envoie le fichier audio et son titre en multipart. |
+| `GET /tracks/:id/audio` | `TrackService.audio(id)` | Protégée; récupère l'audio d'une piste. |
+
+Le backend expose aussi `GET /health` et `DELETE /tracks/:id` (bonus). Dans l'état du frontend inspecté, aucun service n'appelle ces deux routes; elles ne sont donc pas comptées parmi les routes consommées par l'interface Angular.
+
+### Où s'effectue la mise à jour du profil ?
+
+La tâche traverse les fichiers suivants, chacun avec une responsabilité distincte :
+
+1. **Interface Angular :** `frontend-starter/src/app/components/profile-page/profile-page.html` contient le formulaire et lie sa soumission à `save()`.
+2. **Composant :** `frontend-starter/src/app/components/profile-page/profile-page.ts` injecte `AuthService` avec `inject(AuthService)`. `save()` lit le nom du formulaire et appelle `this.auth.update(...)`; il ne construit aucune requête HTTP.
+3. **Service frontend :** `frontend-starter/src/app/shared/services/auth.service.ts`, méthode `update(name)`, envoie `PUT /api/users/me` avec `{ name }`. À la réponse, `tap()` met à jour le signal `currentUser`.
+4. **JWT frontend :** `frontend-starter/src/app/shared/interceptors/auth.interceptor.ts` ajoute `Authorization: Bearer <token>` à la requête si un token est présent.
+5. **Route backend :** `backend/src/app.js`, handler `app.put('/api/users/me', auth, ...)`. Le middleware `auth` vérifie le JWT et place son contenu dans `req.auth`; le handler retrouve l'utilisateur avec `req.auth.sub`, applique le nouveau nom avec `User.findByIdAndUpdate(..., { new: true, runValidators: true })`, puis renvoie `user.toPublic()`. Si l'utilisateur n'existe pas, la route répond `404`.
+
+**Réponse courte à savoir donner :** l'interface déclenche l'action dans `profile-page.html`, le composant `profile-page.ts` délègue à `AuthService`, `auth.service.ts` envoie le `PUT`, et `backend/src/app.js` valide le JWT puis persiste le nom. Le modèle backend `backend/src/models/User.js` porte le schéma et ses règles de validation Mongoose.
+
+### Questions de réflexion sur l'IA
+
+- **Quel assistant est utilisé ?** Dans cette session, l'assistant est GitHub Copilot. Le binôme utilise également Claude IA. Le nom exact du modèle sous-jacent à Copilot dépend du modèle sélectionné dans l'interface Copilot; il faut consulter le sélecteur de modèle dans VS Code plutôt que le déduire du code du projet.
+
+- **Comment connaître la consommation de tokens ?** L'assistant n'a pas accès à la facturation ni au compteur du compte de l'utilisateur. Consulter les indicateurs d'utilisation/facturation fournis par le compte GitHub Copilot et par l'interface ou le compte Anthropic pour Claude. Selon l'offre, l'interface peut compter des requêtes ou afficher une consommation agrégée plutôt qu'un total exact de tokens par conversation; ne pas présenter une estimation comme une mesure réelle.
+- **Qui peut conseiller le meilleur modèle ?** Le sélecteur Copilot et ses descriptions aident à choisir; la documentation des fournisseurs, l'enseignant et le binôme peuvent compléter ce conseil. Le meilleur choix dépend de la tâche, des contraintes de coût et de latence : comparer les résultats sur un exemple représentatif reste la vérification la plus concrète.
+
+### Critiques et vérifications à venir
+
+- Confirmer avec un test que modifier le nom déclenche bien `PUT /api/users/me`, que l'en-tête Bearer est présent et que la réponse actualise le nom affiché.
+- Vérifier dans Network que les composants ne produisent pas eux-mêmes de requêtes et que les appels API passent par `AuthService` ou `TrackService`.
+- Confirmer la liste des routes consommées dans l'onglet Network, notamment distinguer les endpoints exposés par le backend des endpoints réellement appelés par le frontend.
+- Aucun chiffre de tokens n'est rapporté ici, car aucun compteur de compte ou relevé de facturation n'a été consulté.
