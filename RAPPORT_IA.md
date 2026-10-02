@@ -98,3 +98,26 @@ Le préambule du contrat précise que, sauf inscription et connexion, il faut en
 - **Fichier modifié :** `RAPPORT_IA_MODELE.md` uniquement.
 - **Preuve de fonctionnement :** les enchaînements et classifications ci-dessus correspondent aux appels, fournisseurs et guards lus dans le code et aux exigences de `API_CONTRACT.md`. Le test navigateur n'a pas été exécuté dans le cadre de cette mission.
 - **Notions à savoir expliquer sans l'agent :** rôle du composant racine et du `router-outlet`; différence entre route Angular et route API; rôle de `provideHttpClient`, `AuthService`, `authGuard` et `authInterceptor`; parcours du formulaire jusqu'à la réponse HTTP; stockage du token et ajout de l'en-tête Bearer; classement des endpoints publics et protégés.
+
+## Mission : déconnexion, chargement du profil et gestion du 401
+
+### Prompt principal
+
+« Ajouter un bouton de déconnexion dans la navbar qui nettoie l'état local; charger `/api/users/me` à l'ouverture du profil; modifier le nom avec `PUT /api/users/me`; gérer un `401` en supprimant la session et en renvoyant vers `/login` si le token est invalide ou expiré. Préciser la durée de vie du token et mettre à jour le rapport avec le prompt, les critiques et les vérifications à venir. »
+
+### Changements réalisés
+
+| Fichier | Résultat |
+|---|---|
+| `frontend-starter/src/app/components/app/app.ts` et `app.html` | La navbar affiche « Déconnexion » quand une session existe. Le clic appelle `AuthService.logout()` puis navigue vers `/login`; sinon, le lien « Connexion » reste visible. |
+| `frontend-starter/src/app/components/profile-page/profile-page.ts` et `profile-page.html` | L'ouverture de la page déclenche `AuthService.profile()` (`GET /api/users/me`). Le formulaire conserve l'enregistrement du nom via `AuthService.update()` (`PUT /api/users/me`). |
+| `frontend-starter/src/app/shared/interceptors/auth.interceptor.ts` | Un `401` reçu sur une requête protégée efface l'état local et redirige vers `/login`. Les `401` de `/auth/login` ne sont pas traités comme une expiration de session, afin de laisser le formulaire afficher les identifiants incorrects. |
+
+Le service `AuthService` existant retire déjà `gpc_token` du `localStorage` et remet ses signaux `token` et `currentUser` à `null` lors de `logout()`. Le backend crée le JWT avec `expiresIn: "2h"` : sa durée de vie est **2 heures**.
+
+### Critiques et vérifications à venir
+
+- Le guard Angular vérifie seulement la présence du token. C'est le backend qui détecte une signature invalide ou une expiration; le frontend réagit au `401` de la requête protégée suivante. Il n'y a pas de renouvellement automatique du token.
+- Vérifier dans le navigateur : connexion, ouverture du profil et `GET /api/users/me`; modification du nom et `PUT /api/users/me`; déconnexion et absence de `gpc_token` dans le stockage local.
+- Pour tester l'expiration sans attendre deux heures, envoyer une valeur JWT invalide ou expirée, provoquer une requête protégée, puis confirmer le `401`, le nettoyage de session et le retour à `/login`. Vérifier aussi qu'un mauvais mot de passe conserve le message de connexion au lieu d'être traité comme une session expirée.
+- Après modification, le build Angular reste à exécuter; ces vérifications navigateur ne sont pas déclarées comme réalisées tant qu'elles n'ont pas été faites.

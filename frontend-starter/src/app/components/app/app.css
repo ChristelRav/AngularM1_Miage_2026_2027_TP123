@@ -1,1 +1,3 @@
 :host { display: block; }
+
+header button { padding: 0.45rem 0.75rem; color: #123d32; background: white; }
