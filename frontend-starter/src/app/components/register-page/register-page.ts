@@ -1,7 +1,32 @@
 import { Component, inject, signal } from '@angular/core';
-import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  AbstractControl,
+  FormControl,
+  FormGroup,
+  ReactiveFormsModule,
+  ValidationErrors,
+  Validators,
+} from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../shared/services/auth.service';
+import { httpErrorMessage } from '../../shared/utils/http-error';
+
+/** Minimum length enforced by the backend on registration. */
+export const PASSWORD_MIN_LENGTH = 8;
+
+/** Group validator: the confirmation must match the password. */
+function passwordsMatch(group: AbstractControl): ValidationErrors | null {
+  const password = group.get('password')?.value;
+  const confirm = group.get('confirmPassword')?.value;
+  return confirm && password !== confirm ? { passwordMismatch: true } : null;
+}
+
+/** Rejects values made only of spaces. */
+function notBlank(control: AbstractControl): ValidationErrors | null {
+  return typeof control.value === 'string' && control.value.length > 0 && !control.value.trim()
+    ? { blank: true }
+    : null;
+}
 
 @Component({
   imports: [ReactiveFormsModule, RouterLink],
@@ -12,24 +37,54 @@ export class RegisterPageComponent {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
 
+  readonly passwordMinLength = PASSWORD_MIN_LENGTH;
   readonly error = signal('');
-  
-  readonly form = new FormGroup({
-    name: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
-    email: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.email] }),
-    password: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
-  });
+  readonly loading = signal(false);
+
+  readonly form = new FormGroup(
+    {
+      name: new FormControl('', {
+        nonNullable: true,
+        validators: [Validators.required, notBlank, Validators.maxLength(50)],
+      }),
+      email: new FormControl('', {
+        nonNullable: true,
+        validators: [Validators.required, Validators.email],
+      }),
+      password: new FormControl('', {
+        nonNullable: true,
+        validators: [Validators.required, Validators.minLength(PASSWORD_MIN_LENGTH)],
+      }),
+      confirmPassword: new FormControl('', {
+        nonNullable: true,
+        validators: [Validators.required],
+      }),
+    },
+    { validators: passwordsMatch },
+  );
 
   submit(): void {
-    const values = this.form.getRawValue();
-    this.auth.register(values.name, values.email, values.password).subscribe({
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      return;
+    }
+
+    this.error.set('');
+    this.loading.set(true);
+    const { name, email, password } = this.form.getRawValue();
+
+    this.auth.register(name, email, password).subscribe({
       next: () => {
-        console.debug('[RegisterPage] Inscription réussie');
+        this.loading.set(false);
         void this.router.navigateByUrl('/profile');
       },
-      error: (error: { error?: { message?: string } }) => {
-        console.error('[RegisterPage] Échec de l’inscription', error);
-        this.error.set(error.error?.message ?? 'Erreur d’inscription');
+      error: (error: unknown) => {
+        this.loading.set(false);
+        this.error.set(
+          httpErrorMessage(error, {
+            409: 'Cet email est déjà utilisé. Connectez-vous ou choisissez un autre email.',
+          }),
+        );
       },
     });
   }
