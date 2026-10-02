@@ -1,7 +1,8 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../shared/services/auth.service';
+import { httpErrorMessage } from '../../shared/utils/http-error';
 
 @Component({
   imports: [ReactiveFormsModule, RouterLink],
@@ -11,30 +12,50 @@ import { AuthService } from '../../shared/services/auth.service';
 export class LoginPageComponent {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   readonly error = signal('');
+  readonly loading = signal(false);
+
   readonly form = new FormGroup({
-    email: new FormControl('demo@example.com', {
+    email: new FormControl('', {
       nonNullable: true,
       validators: [Validators.required, Validators.email],
     }),
-    password: new FormControl('Demo1234!', {
+    password: new FormControl('', {
       nonNullable: true,
       validators: [Validators.required],
     }),
   });
 
   submit(): void {
-    const values = this.form.getRawValue();
-    this.auth.login(values.email, values.password).subscribe({
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      return;
+    }
+
+    this.error.set('');
+    this.loading.set(true);
+    const { email, password } = this.form.getRawValue();
+
+    this.auth.login(email, password).subscribe({
       next: () => {
-        console.debug('[LoginPage] Connexion réussie');
-        void this.router.navigateByUrl('/tracks');
+        this.loading.set(false);
+        void this.router.navigateByUrl(this.redirectUrl());
       },
-      error: (error: { error?: { message?: string } }) => {
-        console.error('[LoginPage] Échec de connexion', error);
-        this.error.set(error.error?.message ?? 'Erreur de connexion');
+      error: (error: unknown) => {
+        this.loading.set(false);
+        this.form.controls.password.reset();
+        this.error.set(
+          httpErrorMessage(error, { 401: 'Email ou mot de passe incorrect.' }),
+        );
       },
     });
+  }
+
+  /** Returns to the page requested before the guard redirected here, if any. */
+  private redirectUrl(): string {
+    const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
+    return returnUrl?.startsWith('/') && !returnUrl.startsWith('//') ? returnUrl : '/tracks';
   }
 }
