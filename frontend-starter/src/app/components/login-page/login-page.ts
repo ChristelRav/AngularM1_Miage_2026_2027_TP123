@@ -18,11 +18,11 @@ export class LoginPageComponent {
   readonly loading = signal(false);
 
   readonly form = new FormGroup({
-    email: new FormControl('', {
+    email: new FormControl('demo@example.com', {
       nonNullable: true,
       validators: [Validators.required, Validators.email],
     }),
-    password: new FormControl('', {
+    password: new FormControl('Demo1234!', {
       nonNullable: true,
       validators: [Validators.required],
     }),
@@ -45,7 +45,7 @@ export class LoginPageComponent {
       },
       error: (error: unknown) => {
         this.loading.set(false);
-        this.form.controls.password.reset();
+        this.form.controls.password.setValue('');
         this.error.set(
           httpErrorMessage(error, { 401: 'Email ou mot de passe incorrect.' }),
         );
