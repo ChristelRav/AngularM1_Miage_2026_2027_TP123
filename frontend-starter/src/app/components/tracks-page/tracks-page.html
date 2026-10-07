@@ -21,22 +21,31 @@
       @if (loading()) {
         <p>Chargement…</p>
       }
-      @for (track of tracks(); track track.id) {
-        <div class="track">
-          <div>
-            <b>{{ track.title }}</b>
-            <small>{{ track.originalName }} · {{ track.size }} Ko</small>
-          </div>
-          <button type="button" (click)="play(track)" [attr.aria-label]="'Lire ' + track.title">▶</button>
-        </div>
-      } @empty {
-        <p>Aucune piste.</p>
+      @if (error(); as message) {
+        <p role="alert">{{ message }}</p>
       }
-      <div class="pager">
-        <button type="button" (click)="go(page() - 1)" [disabled]="page() === 1">Préc.</button>
-        <span>Page {{ page() }} / {{ pages() }}</span>
-        <button type="button" (click)="go(page() + 1)" [disabled]="page() === pages()">Suiv.</button>
-      </div>
+      @if (!loading() && !error()) {
+        @for (track of tracks(); track track.id) {
+          <div class="track">
+            <div>
+              <b>{{ track.title }}</b>
+              <small>{{ track.originalName }} · {{ track.size }} Ko</small>
+            </div>
+            <button type="button" (click)="play(track)" [attr.aria-label]="'Lire ' + track.title">▶</button>
+          </div>
+        } @empty {
+          <p>Aucune piste.</p>
+        }
+      }
+      <mat-paginator
+        [length]="total()"
+        [pageIndex]="page() - 1"
+        [pageSize]="limit()"
+        [pageSizeOptions]="pageSizeOptions"
+        [showFirstLastButtons]="true"
+        (page)="pageChanged($event)"
+        aria-label="Pagination de la bibliothèque"
+      />
       @if (audioUrl()) {
         <audio [src]="audioUrl()" controls autoplay></audio>
       }
