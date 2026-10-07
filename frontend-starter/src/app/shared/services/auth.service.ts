@@ -1,8 +1,9 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { tap } from 'rxjs';
+import { catchError, tap, throwError } from 'rxjs';
 import { AuthResponse } from '../models/auth-response.model';
 import { User } from '../models/user.model';
+import { httpErrorMessage } from '../utils/http-error';
 
 const TOKEN_KEY = 'gpc_token';
 
@@ -15,12 +16,19 @@ export class AuthService {
   readonly token = signal<string | null>(readToken());
   readonly isAuthenticated = computed(() => this.token() !== null);
 
+  /** Errors are emitted as `Error` objects whose message can be shown as is. */
   login(email: string, password: string) {
     return this.http
       .post<AuthResponse>('/api/auth/login', { email: email.trim().toLowerCase(), password })
-      .pipe(tap((response) => this.storeAuthentication(response)));
+      .pipe(
+        tap((response) => this.storeAuthentication(response)),
+        catchError((error: unknown) =>
+          throwError(() => new Error(httpErrorMessage(error, { 401: 'Email ou mot de passe incorrect.' }))),
+        ),
+      );
   }
 
+  /** Errors are emitted as `Error` objects whose message can be shown as is. */
   register(name: string, email: string, password: string) {
     return this.http
       .post<AuthResponse>('/api/auth/register', {
@@ -28,7 +36,19 @@ export class AuthService {
         email: email.trim().toLowerCase(),
         password,
       })
-      .pipe(tap((response) => this.storeAuthentication(response)));
+      .pipe(
+        tap((response) => this.storeAuthentication(response)),
+        catchError((error: unknown) =>
+          throwError(
+            () =>
+              new Error(
+                httpErrorMessage(error, {
+                  409: 'Cet email est déjà utilisé. Connectez-vous ou choisissez un autre email.',
+                }),
+              ),
+          ),
+        ),
+      );
   }
 
   profile() {

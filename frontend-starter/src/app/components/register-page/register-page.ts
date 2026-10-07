@@ -9,7 +9,6 @@ import {
 } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../shared/services/auth.service';
-import { httpErrorMessage } from '../../shared/utils/http-error';
 
 /** Minimum length enforced by the backend on registration. */
 export const PASSWORD_MIN_LENGTH = 8;
@@ -78,13 +77,9 @@ export class RegisterPageComponent {
         this.loading.set(false);
         void this.router.navigateByUrl('/profile');
       },
-      error: (error: unknown) => {
+      error: (error: Error) => {
         this.loading.set(false);
-        this.error.set(
-          httpErrorMessage(error, {
-            409: 'Cet email est déjà utilisé. Connectez-vous ou choisissez un autre email.',
-          }),
-        );
+        this.error.set(error.message);
       },
     });
   }

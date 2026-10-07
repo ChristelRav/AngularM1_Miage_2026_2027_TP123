@@ -2,7 +2,6 @@ import { Component, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../shared/services/auth.service';
-import { httpErrorMessage } from '../../shared/utils/http-error';
 
 @Component({
   imports: [ReactiveFormsModule, RouterLink],
@@ -43,12 +42,10 @@ export class LoginPageComponent {
         this.loading.set(false);
         void this.router.navigateByUrl(this.redirectUrl());
       },
-      error: (error: unknown) => {
+      error: (error: Error) => {
         this.loading.set(false);
         this.form.controls.password.setValue('');
-        this.error.set(
-          httpErrorMessage(error, { 401: 'Email ou mot de passe incorrect.' }),
-        );
+        this.error.set(error.message);
       },
     });
   }
