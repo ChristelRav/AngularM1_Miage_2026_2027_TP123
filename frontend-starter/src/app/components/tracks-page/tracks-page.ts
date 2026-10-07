@@ -1,13 +1,21 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, ElementRef, inject, signal, viewChild } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { IconComponent } from '../../shared/components/icon/icon';
 import { MatPaginatorIntl, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { Track } from '../../shared/models/track.model';
+import { AudioFormatPipe, FileSizePipe, ShortDatePipe } from '../../shared/pipes/track-format.pipes';
 import { TrackService } from '../../shared/services/track.service';
 import { httpErrorMessage } from '../../shared/utils/http-error';
 
 @Component({
-  imports: [ReactiveFormsModule, IconComponent, MatPaginatorModule],
+  imports: [
+    ReactiveFormsModule,
+    IconComponent,
+    MatPaginatorModule,
+    AudioFormatPipe,
+    FileSizePipe,
+    ShortDatePipe,
+  ],
   providers: [
     {
       provide: MatPaginatorIntl,
@@ -38,15 +46,21 @@ export class TracksPageComponent {
   readonly error = signal<string | null>(null);
   readonly audioUrl = signal('');
   readonly title = new FormControl('', { nonNullable: true });
-  file?: File;
+  readonly file = signal<File | null>(null);
+  readonly uploading = signal(false);
+  readonly uploadError = signal<string | null>(null);
+  readonly uploadSuccess = signal<string | null>(null);
+  private readonly fileInput = viewChild.required<ElementRef<HTMLInputElement>>('fileInput');
 
   constructor() {
     this.load();
   }
 
   choose(event: Event): void {
-    this.file = (event.target as HTMLInputElement).files?.[0];
-    console.debug('[TracksPage] Fichier sélectionné', this.file?.name);
+    this.file.set((event.target as HTMLInputElement).files?.[0] ?? null);
+    this.uploadError.set(null);
+    this.uploadSuccess.set(null);
+    console.debug('[TracksPage] Fichier sélectionné', this.file()?.name);
   }
 
   load(): void {
@@ -80,18 +94,34 @@ export class TracksPageComponent {
   }
 
   upload(): void {
-    if (!this.file) return;
+    const file = this.file();
+    // Guard against double submissions while a request is in flight.
+    if (!file || this.uploading()) return;
 
-    this.service.upload(this.file, this.title.value || this.file.name).subscribe({
+    this.uploading.set(true);
+    this.uploadError.set(null);
+    this.uploadSuccess.set(null);
+
+    this.service.upload(file, this.title.value.trim() || file.name).subscribe({
       next: (track) => {
         console.debug('[TracksPage] Piste envoyée', track.id);
-        this.title.setValue('');
-        this.file = undefined;
-        this.page.set(1);
-        this.load();
+        this.uploading.set(false);
+        this.uploadSuccess.set(`« ${track.title} » a bien été ajouté à votre bibliothèque.`);
+        this.resetUploadForm();
+        this.go(1);
       },
-      error: (error) => console.error('[TracksPage] Envoi impossible', error),
+      error: (error: Error) => {
+        this.uploading.set(false);
+        this.uploadError.set(error.message);
+      },
     });
+  }
+
+  private resetUploadForm(): void {
+    this.title.setValue('');
+    this.file.set(null);
+    // A file input can only be cleared through its DOM value.
+    this.fileInput().nativeElement.value = '';
   }
 
   play(track: Track): void {

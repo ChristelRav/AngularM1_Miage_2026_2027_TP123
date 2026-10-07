@@ -6,14 +6,32 @@
   </div>
 
   <div class="grid">
-    <article class="card">
+    <article class="card" [attr.aria-busy]="uploading()">
       <div class="card-header">
         <span class="card-icon"><app-icon name="upload" /></span>
         <h2>Importer</h2>
       </div>
       <label>Titre<input [formControl]="title" /></label>
-      <label>Fichier audio<input type="file" accept="audio/*" (change)="choose($event)" /></label>
-      <button type="button" (click)="upload()" [disabled]="!file"><app-icon name="upload" />Envoyer</button>
+      <label>
+        Fichier audio
+        <input #fileInput type="file" accept="audio/*" (change)="choose($event)" [disabled]="uploading()" />
+      </label>
+      <button type="button" (click)="upload()" [disabled]="!file() || uploading()">
+        @if (uploading()) {
+          <span class="spinner" aria-hidden="true"></span>Envoi en cours…
+        } @else {
+          <app-icon name="upload" />Envoyer
+        }
+      </button>
+
+      <div aria-live="polite">
+        @if (uploadSuccess(); as message) {
+          <p class="success">{{ message }}</p>
+        }
+      </div>
+      @if (uploadError(); as message) {
+        <p class="error" role="alert"><app-icon name="alert" />{{ message }}</p>
+      }
     </article>
 
     <article class="card">
@@ -31,17 +49,43 @@
         <p class="error" role="alert"><app-icon name="alert" />{{ message }}</p>
       }
       @if (!loading() && !error()) {
-        @for (track of tracks(); track track.id) {
-          <div class="track">
-            <div>
-              <b>{{ track.title }}</b>
-              <small>{{ track.originalName }} · {{ track.size }} Ko</small>
-            </div>
-            <button type="button" class="btn-icon" (click)="play(track)" [attr.aria-label]="'Lire ' + track.title"><app-icon name="play" /></button>
-          </div>
-        } @empty {
-          <p>Aucune piste.</p>
-        }
+        <ul class="track-grid" aria-label="Morceaux de la page">
+          @for (track of tracks(); track track.id) {
+            <li>
+              <article class="track-card" [attr.aria-labelledby]="'track-title-' + track.id">
+                <div class="track-cover" aria-hidden="true"><app-icon name="music" /></div>
+                <div class="track-body">
+                  <h3 [id]="'track-title-' + track.id" [title]="track.title">{{ track.title }}</h3>
+                  <p class="track-file" [title]="track.originalName">{{ track.originalName }}</p>
+                  <dl class="track-meta">
+                    <div>
+                      <dt>Format</dt>
+                      <dd><span class="badge">{{ track.mimeType | audioFormat }}</span></dd>
+                    </div>
+                    <div>
+                      <dt>Taille</dt>
+                      <dd>{{ track.size | fileSize }}</dd>
+                    </div>
+                    <div>
+                      <dt>Ajouté le</dt>
+                      <dd><time [attr.datetime]="track.createdAt">{{ track.createdAt | shortDate }}</time></dd>
+                    </div>
+                  </dl>
+                </div>
+                <button
+                  type="button"
+                  class="btn-icon"
+                  (click)="play(track)"
+                  [attr.aria-label]="'Lire ' + track.title"
+                >
+                  <app-icon name="play" />
+                </button>
+              </article>
+            </li>
+          } @empty {
+            <li class="empty">Aucune piste pour l’instant. Importez votre premier morceau !</li>
+          }
+        </ul>
       }
       <mat-paginator
         [length]="total()"

@@ -239,3 +239,32 @@ La tâche traverse les fichiers suivants, chacun avec une responsabilité distin
 
 - Exécuter le test ciblé et le build, puis confirmer dans Network les paramètres réels des requêtes avec le backend actif.
 - Les options de taille pourraient être ajustées aux volumes usuels de la bibliothèque; aucune modification backend ou de `API_CONTRACT.md` n'est nécessaire pour cette intégration.
+
+## Mission 3:Analyse amélioration de l’upload et de la lecture audio
+
+### Prompt utilisé
+Dans le projet ajoute pendant l'envoie du fichier :
+afficher un état de chargement ;
+désactiver le bouton et empêcher les doubles soumissions ;
+afficher les erreurs du serveur ;
+afficher un message de succès ;
+vider le formulaire et recharger la première page après succès
+
+### Modifications effectuées
+| Fichier modifié | Modifications faites |
+|---|---|
+| `frontend-starter/src/app/shared/services/track.service.ts` | `upload()` intercepte les erreurs HTTP avec `catchError` et les renvoie sous forme d'`Error` dont le message est lisible tel quel. La fonction `uploadErrorMessage()` traduit les messages connus du serveur : « File too large » de Multer devient « Fichier trop volumineux : 25 Mo maximum. », et « Format audio non accepté » précise les formats acceptés. Les autres cas passent par l'utilitaire existant `httpErrorMessage()` (serveur injoignable, message du serveur, statut). Le `FormData` (`audio` + `title`) est inchangé. |
+| `frontend-starter/src/app/components/tracks-page/tracks-page.ts` | **Chargement** : nouveau Signal `uploading`, à `true` pendant la requête. **Doubles soumissions** : garde `if (!file \|\| this.uploading()) return` au début d'`upload()`. **Erreurs serveur** : Signal `uploadError`, rempli avec le message du service. **Succès** : Signal `uploadSuccess` (« « Titre » a bien été ajouté à votre bibliothèque. »). **Réinitialisation** : `resetUploadForm()` vide le titre, le Signal `file` et l'`<input type="file">` (via `viewChild('fileInput')`), puis `go(1)` recharge la première page. Le champ `file` devient un Signal, et choisir un nouveau fichier efface les anciens messages. |
+| `frontend-starter/src/app/components/tracks-page/tracks-page.html` | Le bouton « Envoyer » est désactivé si aucun fichier n'est choisi **ou** si un envoi est en cours. Pendant l'envoi, il affiche un spinner et « Envoi en cours… ». Le champ fichier est aussi désactivé pendant l'envoi, et la carte porte `aria-busy`. Ajout du message de succès dans une zone `aria-live="polite"` (annoncé par les lecteurs d'écran) et du message d'erreur avec `role="alert"` et une icône. Référence `#fileInput` ajoutée sur l'input fichier. |
+| `frontend-starter/src/app/components/tracks-page/tracks-page.css` | Ajout de la classe `.success` (encadré vert) et du `.spinner` animé (`@keyframes spin`) affiché dans le bouton pendant l'envoi. |
+
+### Prompt utilisé
+Dans le projet fais ceci présente les morceau sous forme de cards responsives et accessibles.Une card peut afficher le titre, le nom original, le format, la taille, la date d’ajout et une action de lecture. 
+
+### Modifications effectuées
+| Fichier modifié | Modifications faites |
+|---|---|
+| `frontend-starter/src/app/shared/pipes/track-format.pipes.ts` (nouveau) | Trois pipes de formatage, purs et réutilisables. `audioFormat` transforme le type MIME en libellé lisible (`audio/mpeg` → `MP3`, `audio/x-m4a` → `M4A`…). `fileSize` convertit la taille, que l'API renvoie en **octets**, en o / Ko / Mo (ex. `3,4 Mo`). `shortDate` formate la date ISO en français (ex. `7 oct. 2026`). |
+| `frontend-starter/src/app/components/tracks-page/tracks-page.ts` | Import des trois pipes dans `imports` du composant. Aucune logique modifiée. |
+| `frontend-starter/src/app/components/tracks-page/tracks-page.html` | La liste de lignes `<div class="track">` est remplacée par une liste `<ul>` / `<li>` de cards `<article>`. Chaque card contient : une vignette décorative (`aria-hidden`) ; le titre en `<h3>`, relié à la card par `aria-labelledby` ; le nom original ; une liste de définitions `<dl>` (Format, Taille, Ajouté le), avec la date dans une balise `<time datetime>` ; le bouton de lecture avec `aria-label="Lire <titre>"`. Un titre trop long est coupé avec « … », et le texte complet reste visible au survol (`title`). L'état vide devient un message « Aucune piste pour l'instant… ». Correction : la taille était affichée en « Ko » alors que la valeur est en octets. |
+| `frontend-starter/src/app/components/tracks-page/tracks-page.css` | Styles des cards. **Responsive** : grille `repeat(auto-fill, minmax(260px, 1fr))`, qui passe de 1 à plusieurs colonnes selon la largeur, sans media query. **Mise en forme** : vignette dégradée, badge de format, métadonnées en ligne qui passent à la ligne si besoin. **Accessibilité** : la bordure et l'ombre de la card réagissent aussi à `:focus-within`, ce qui rend visible la card dont le bouton a le focus clavier. L'état vide a une bordure en pointillés. |
