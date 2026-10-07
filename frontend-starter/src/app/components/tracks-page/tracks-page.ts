@@ -1,10 +1,11 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { IconComponent } from '../../shared/components/icon/icon';
 import { Track } from '../../shared/models/track.model';
 import { TrackService } from '../../shared/services/track.service';
 
 @Component({
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, IconComponent],
   templateUrl: './tracks-page.html',
   styleUrl: './tracks-page.css',
 })

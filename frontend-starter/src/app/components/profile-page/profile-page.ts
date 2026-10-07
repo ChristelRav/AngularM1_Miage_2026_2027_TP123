@@ -1,9 +1,10 @@
 import { Component, inject } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { IconComponent } from '../../shared/components/icon/icon';
 import { AuthService } from '../../shared/services/auth.service';
 
 @Component({
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, IconComponent],
   templateUrl: './profile-page.html',
   styleUrl: './profile-page.css',
 })

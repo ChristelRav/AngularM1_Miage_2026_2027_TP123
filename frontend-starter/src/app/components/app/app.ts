@@ -1,10 +1,11 @@
 import { Component, inject } from '@angular/core';
-import { Router, RouterLink, RouterOutlet } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { IconComponent } from '../../shared/components/icon/icon';
 import { AuthService } from '../../shared/services/auth.service';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterLink, RouterOutlet],
+  imports: [RouterLink, RouterLinkActive, RouterOutlet, IconComponent],
   templateUrl: './app.html',
   styleUrl: './app.css',
 })

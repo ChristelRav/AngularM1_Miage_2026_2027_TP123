@@ -8,6 +8,7 @@ import {
   Validators,
 } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { IconComponent } from '../../shared/components/icon/icon';
 import { AuthService } from '../../shared/services/auth.service';
 
 /** Minimum length enforced by the backend on registration. */
@@ -28,7 +29,7 @@ function notBlank(control: AbstractControl): ValidationErrors | null {
 }
 
 @Component({
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, IconComponent],
   templateUrl: './register-page.html',
   styleUrl: './register-page.css',
 })

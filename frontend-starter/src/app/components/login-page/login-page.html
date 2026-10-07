@@ -1,5 +1,9 @@
 <section class="card">
-  <h1>Connexion</h1>
+  <div class="card-header">
+    <span class="card-icon"><app-icon name="login" /></span>
+    <h1>Connexion</h1>
+  </div>
+  <p class="subtitle">Retrouvez vos backing tracks et reprenez votre entraînement.</p>
   <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
     <label>
       Email
@@ -36,11 +40,12 @@
     }
 
     <button type="submit" [disabled]="loading()">
+      <app-icon name="login" />
       {{ loading() ? 'Connexion…' : 'Se connecter' }}
     </button>
   </form>
   @if (error()) {
-    <p class="error" role="alert">{{ error() }}</p>
+    <p class="error" role="alert"><app-icon name="alert" />{{ error() }}</p>
   }
-  <p>Pas encore de compte ? <a routerLink="/register">Créer un compte</a></p>
+  <p class="switch">Pas encore de compte ? <a routerLink="/register">Créer un compte</a></p>
 </section>

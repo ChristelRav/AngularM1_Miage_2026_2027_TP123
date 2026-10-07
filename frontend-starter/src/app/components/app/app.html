@@ -1,15 +1,27 @@
-<header>
-  <div>
-    <b>Guitar Practice Cloud</b>
-    <small>Le cloud qui manque à votre ampli</small>
-  </div>
+<header class="topbar">
+  <a class="brand" routerLink="/tracks">
+    <span class="brand-logo"><app-icon name="guitar" /></span>
+    <span class="brand-text">
+      <b>Guitar Practice Cloud</b>
+      <small>Le cloud qui manque à votre ampli</small>
+    </span>
+  </a>
+
   <nav aria-label="Navigation principale">
-    <a routerLink="/tracks">Backing tracks</a>
-    <a routerLink="/profile">Profil</a>
+    <a class="nav-link" routerLink="/tracks" routerLinkActive="active" ariaCurrentWhenActive="page">
+      <app-icon name="music" /><span class="nav-label">Backing tracks</span>
+    </a>
+    <a class="nav-link" routerLink="/profile" routerLinkActive="active" ariaCurrentWhenActive="page">
+      <app-icon name="user" /><span class="nav-label">Profil</span>
+    </a>
     @if (auth.isAuthenticated()) {
-      <button type="button" (click)="logout()">Déconnexion</button>
+      <button type="button" class="nav-link nav-cta" (click)="logout()">
+        <app-icon name="logout" /><span class="nav-label">Déconnexion</span>
+      </button>
     } @else {
-      <a routerLink="/login">Connexion</a>
+      <a class="nav-link nav-cta" routerLink="/login" routerLinkActive="active" ariaCurrentWhenActive="page">
+        <app-icon name="login" /><span class="nav-label">Connexion</span>
+      </a>
     }
   </nav>
 </header>

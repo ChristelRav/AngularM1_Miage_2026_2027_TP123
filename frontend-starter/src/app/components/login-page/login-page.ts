@@ -1,10 +1,11 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { IconComponent } from '../../shared/components/icon/icon';
 import { AuthService } from '../../shared/services/auth.service';
 
 @Component({
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, IconComponent],
   templateUrl: './login-page.html',
   styleUrl: './login-page.css',
 })
