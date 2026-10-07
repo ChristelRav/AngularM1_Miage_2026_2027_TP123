@@ -175,3 +175,67 @@ La tâche traverse les fichiers suivants, chacun avec une responsabilité distin
 - Vérifier dans Network que les composants ne produisent pas eux-mêmes de requêtes et que les appels API passent par `AuthService` ou `TrackService`.
 - Confirmer la liste des routes consommées dans l'onglet Network, notamment distinguer les endpoints exposés par le backend des endpoints réellement appelés par le frontend.
 - Aucun chiffre de tokens n'est rapporté ici, car aucun compteur de compte ou relevé de facturation n'a été consulté.
+
+## Mission 2 : bibliothèque paginée côté serveur
+
+### Prompt utilisé
+
+« Implémenter la pagination de la bibliothèque Angular en envoyant `page` et `limit` à `GET /api/tracks`, utiliser les Signals et la syntaxe `@if`/`@for`/`@empty`, permettre la navigation entre les pages, ne pas modifier le backend et documenter les changements en prenant ce rapport comme exemple. »
+
+### Constats avant modification
+
+- `TracksPageComponent` utilisait déjà les Signals `tracks`, `page`, `pages` et `loading`, avec `@if`, `@for` et `@empty` dans le template. Il n'avait pas de signal d'erreur.
+- `TrackService.list(page = 1, limit = 5)` envoyait déjà `page` et `limit` dans les paramètres de `GET /api/tracks`. Le composant n'indiquait pas explicitement `limit`, et sa navigation HTML gérait les bornes avec des boutons « Préc. » et « Suiv. ».
+- `API_CONTRACT.md` confirme une réponse `Page<Track>` contenant `items`, `page`, `limit`, `total` et `pages`.
+- Angular Material était déjà présent dans les dépendances et son thème figurait dans la configuration du frontend; aucun package n'a été ajouté pour cette mission.
+
+### Modifications effectuées
+
+| Fichier | Modification |
+|---|---|
+| `frontend-starter/src/app/components/tracks-page/tracks-page.ts` | Ajout d'une limite explicite de 5 pistes par page, d'un signal `error` et d'un signal `total` pour le paginator. Le chargement appelle `TrackService.list(page, limit)`, met à jour les métadonnées de réponse et affiche les erreurs avec le helper partagé `httpErrorMessage`. L'événement de pagination déclenche `go()` et donc une nouvelle requête. |
+| `frontend-starter/src/app/components/tracks-page/tracks-page.html` | Remplacement des boutons natifs par `MatPaginator`; les boutons de pagination sont libellés « Précédent » et « Suivant ». L'affichage des résultats reste en `@for` avec `@empty`; les états de chargement et d'erreur utilisent `@if`. |
+| `frontend-starter/src/app/components/tracks-page/tracks-page.spec.ts` | Ajout d'un test HTTP ciblé qui vérifie les paramètres `page=1&limit=5` au chargement initial puis `page=2&limit=5` après le changement de page, ainsi que les pistes reçues. |
+| `RAPPORT_IA.md` | Ajout du présent compte rendu. |
+
+`TrackService` et le backend n'ont pas été modifiés : le service envoyait déjà les deux paramètres via `HttpClient` et l'API répond déjà au contrat paginé. Aucune pagination locale n'est effectuée.
+
+### Choix techniques, vérification et limites
+
+- `MatPaginator` est utilisé parce qu'Angular Material était déjà installé et configuré; sa taille de page est fixe à 5 et aucune dépendance n'a été ajoutée.
+- Le `MatPaginatorIntl` localise les libellés des boutons en français. Le signal `total` fournit le nombre d'éléments au paginator, tandis que `pages` conserve le nombre total de pages renvoyé par l'API.
+- La vérification de diagnostics disponible dans VS Code n'a signalé aucune erreur dans le composant, son template et le test.
+- L'exécution du test et de `npm run build` a été refusée par l'outil d'exécution pendant cette session. Le test a donc été écrit mais son résultat, le build et une observation réelle de la requête dans l'onglet Network restent à confirmer. Le test ajouté doit démontrer qu'un changement de page entraîne une seconde requête avec les bons paramètres lorsqu'il sera exécuté.
+
+### Critiques et évolutions possibles
+
+- Le test HTTP n'a pas pu être exécuté ici; il faut lancer le test ciblé et le build, puis confirmer les requêtes dans Network avec le backend actif.
+- L'option avancée de pagination Mongoose avec `aggregate-paginate-v2` n'a pas été réalisée. Si elle est retenue plus tard, il faudra adapter la réponse backend, mettre à jour `API_CONTRACT.md` et ajuster le modèle et le traitement frontend.
+- Des tests supplémentaires pourraient couvrir les erreurs HTTP, une page sans résultat et le désactivation des commandes aux première et dernière pages.
+
+## Mission 2 — Amélioration de la pagination avec Angular Material
+
+### Prompt utilisé
+
+« Remplacer le système actuel de pagination par le composant officiel `MatPaginator`, avec choix du nombre d'éléments, plage affichée et boutons première/précédente/suivante/dernière page. Conserver la pagination côté serveur et déclencher une nouvelle requête avec les nouvelles valeurs `page` et `limit` lors d'un changement de page ou de taille. Conserver les Signals existants, ne pas modifier le backend ni le contrat API, et ajouter le prompt et les modifications réellement effectuées à ce rapport. »
+
+### Modifications effectuées
+
+| Fichier | Modification |
+|---|---|
+| `frontend-starter/src/app/components/tracks-page/tracks-page.ts` | `limit` est maintenant un Signal; les options de taille sont 5, 10, 25 et 50 éléments. `pageChanged()` prend `pageIndex` et `pageSize` de l'événement Angular Material, met à jour l'état puis relance le chargement serveur. Les libellés des commandes et du sélecteur sont localisés en français. |
+| `frontend-starter/src/app/components/tracks-page/tracks-page.html` | Activation des options de taille et de `showFirstLastButtons` sur `MatPaginator`; le nombre total (`total`) et la page courante continuent de provenir de la réponse paginée serveur. |
+| `frontend-starter/src/app/components/tracks-page/tracks-page.spec.ts` | Extension du test HTTP pour vérifier qu'un changement de page envoie `page=2&limit=5`, puis qu'un changement de taille envoie `page=1&limit=10`. |
+| `RAPPORT_IA.md` | Ajout de ce compte rendu de suivi. |
+
+### Choix et vérifications
+
+- Le `MatPaginator` officiel reste relié à `TrackService.list(page, limit)`; aucune récupération intégrale ni découpe locale des pistes n'est ajoutée.
+- Les tailles proposées sont 5, 10, 25 et 50. Angular Material affiche la plage d'éléments calculée avec la longueur totale renvoyée par le serveur et désactive ses commandes aux limites.
+- Le signal `pages` et les signaux `tracks`, `page`, `loading` et `error` sont conservés.
+- Le test automatisé vérifie les paramètres des deux requêtes attendues. Son exécution et le build restent à lancer; aucun résultat d'exécution n'est affirmé dans ce rapport.
+
+### Évolutions futures
+
+- Exécuter le test ciblé et le build, puis confirmer dans Network les paramètres réels des requêtes avec le backend actif.
+- Les options de taille pourraient être ajustées aux volumes usuels de la bibliothèque; aucune modification backend ou de `API_CONTRACT.md` n'est nécessaire pour cette intégration.
