@@ -1,10 +1,16 @@
 import { Component, ElementRef, inject, signal, viewChild } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { IconComponent } from '../../shared/components/icon/icon';
+import { MatDialog } from '@angular/material/dialog';
 import { MatPaginatorIntl, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import {
+  ConfirmDialogComponent,
+  ConfirmDialogData,
+} from '../../shared/components/confirm-dialog/confirm-dialog';
 import { Track } from '../../shared/models/track.model';
 import { AudioFormatPipe, FileSizePipe, ShortDatePipe } from '../../shared/pipes/track-format.pipes';
-import { TrackService } from '../../shared/services/track.service';
+import { TrackRemovalError, TrackService } from '../../shared/services/track.service';
 import { httpErrorMessage } from '../../shared/utils/http-error';
 
 @Component({
@@ -35,6 +41,8 @@ import { httpErrorMessage } from '../../shared/utils/http-error';
 })
 export class TracksPageComponent {
   private readonly service = inject(TrackService);
+  private readonly dialog = inject(MatDialog);
+  private readonly snackBar = inject(MatSnackBar);
 
   readonly limit = signal(5);
   readonly pageSizeOptions = [5, 10, 25, 50];
@@ -45,12 +53,16 @@ export class TracksPageComponent {
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly audioUrl = signal('');
+  /** Id of the track loaded in the <audio> player. */
+  private readonly playingTrackId = signal<string | null>(null);
   readonly title = new FormControl('', { nonNullable: true });
   readonly file = signal<File | null>(null);
   readonly uploading = signal(false);
   readonly uploadError = signal<string | null>(null);
   readonly uploadSuccess = signal<string | null>(null);
   private readonly fileInput = viewChild.required<ElementRef<HTMLInputElement>>('fileInput');
+  /** Ids of the tracks whose DELETE request is in flight. */
+  readonly deletingIds = signal<ReadonlySet<string>>(new Set());
 
   constructor() {
     this.load();
@@ -131,8 +143,86 @@ export class TracksPageComponent {
         const previousUrl = this.audioUrl();
         if (previousUrl) URL.revokeObjectURL(previousUrl);
         this.audioUrl.set(URL.createObjectURL(blob));
+        this.playingTrackId.set(track.id);
       },
       error: (error) => console.error('[TracksPage] Lecture impossible', error),
+    });
+  }
+
+  remove(track: Track): void {
+    // Ignore clicks while this track is already being deleted.
+    if (this.deletingIds().has(track.id)) return;
+
+    this.dialog
+      .open<ConfirmDialogComponent, ConfirmDialogData, boolean>(ConfirmDialogComponent, {
+        data: {
+          title: 'Supprimer ce morceau ?',
+          message: `« ${track.title} » sera définitivement supprimé de votre bibliothèque. Cette action est irréversible.`,
+          confirmLabel: 'Supprimer',
+        },
+      })
+      .afterClosed()
+      .subscribe((confirmed) => {
+        if (confirmed) this.deleteTrack(track);
+      });
+  }
+
+  private deleteTrack(track: Track): void {
+    this.setDeleting(track.id, true);
+
+    this.service.remove(track.id).subscribe({
+      next: () => {
+        this.setDeleting(track.id, false);
+        this.stopPlaybackOf(track.id);
+        this.notify(`« ${track.title} » a été supprimé.`);
+        this.refreshAfterRemoval();
+      },
+      error: (error: TrackRemovalError) => {
+        this.setDeleting(track.id, false);
+        this.notify(error.message, true);
+        // Already deleted elsewhere (other tab) or not ours: the card must disappear.
+        if (error.trackGone) {
+          this.stopPlaybackOf(track.id);
+          this.refreshAfterRemoval();
+        }
+      },
+    });
+  }
+
+  /**
+   * The player reads a Blob already downloaded in memory, so deleting the file on the
+   * server does not stop it. Removing the <audio> element (via @if) pauses playback,
+   * and revoking the ObjectURL frees the Blob.
+   */
+  private stopPlaybackOf(trackId: string): void {
+    if (this.playingTrackId() !== trackId) return;
+    URL.revokeObjectURL(this.audioUrl());
+    this.audioUrl.set('');
+    this.playingTrackId.set(null);
+  }
+
+  /** Reloads the current page, or the previous one if its last card was just removed. */
+  private refreshAfterRemoval(): void {
+    if (this.tracks().length === 1 && this.page() > 1) {
+      this.go(this.page() - 1);
+    } else {
+      this.load();
+    }
+  }
+
+  private setDeleting(id: string, deleting: boolean): void {
+    this.deletingIds.update((ids) => {
+      const next = new Set(ids);
+      if (deleting) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  private notify(message: string, isError = false): void {
+    this.snackBar.open(message, 'OK', {
+      duration: isError ? 8000 : 4000,
+      panelClass: isError ? 'snack-error' : 'snack-success',
     });
   }
 }

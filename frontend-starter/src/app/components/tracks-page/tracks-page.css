@@ -94,3 +94,8 @@
   border: 2px dashed var(--border);
   border-radius: 12px;
 }
+
+/* ---------- Card actions (play / delete) ---------- */
+.track-actions { display: flex; flex-direction: column; gap: 0.4rem; }
+.track-card.deleting { opacity: 0.55; }
+.spinner.dark { border-color: var(--border); border-top-color: var(--danger); }

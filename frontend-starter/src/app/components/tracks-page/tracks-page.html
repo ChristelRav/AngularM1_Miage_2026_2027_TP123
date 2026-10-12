@@ -52,7 +52,12 @@
         <ul class="track-grid" aria-label="Morceaux de la page">
           @for (track of tracks(); track track.id) {
             <li>
-              <article class="track-card" [attr.aria-labelledby]="'track-title-' + track.id">
+              <article
+                class="track-card"
+                [class.deleting]="deletingIds().has(track.id)"
+                [attr.aria-busy]="deletingIds().has(track.id)"
+                [attr.aria-labelledby]="'track-title-' + track.id"
+              >
                 <div class="track-cover" aria-hidden="true"><app-icon name="music" /></div>
                 <div class="track-body">
                   <h3 [id]="'track-title-' + track.id" [title]="track.title">{{ track.title }}</h3>
@@ -72,14 +77,30 @@
                     </div>
                   </dl>
                 </div>
-                <button
-                  type="button"
-                  class="btn-icon"
-                  (click)="play(track)"
-                  [attr.aria-label]="'Lire ' + track.title"
-                >
-                  <app-icon name="play" />
-                </button>
+                <div class="track-actions">
+                  <button
+                    type="button"
+                    class="btn-icon"
+                    (click)="play(track)"
+                    [disabled]="deletingIds().has(track.id)"
+                    [attr.aria-label]="'Lire ' + track.title"
+                  >
+                    <app-icon name="play" />
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-icon btn-danger-ghost"
+                    (click)="remove(track)"
+                    [disabled]="deletingIds().has(track.id)"
+                    [attr.aria-label]="(deletingIds().has(track.id) ? 'Suppression en cours de ' : 'Supprimer ') + track.title"
+                  >
+                    @if (deletingIds().has(track.id)) {
+                      <span class="spinner dark" aria-hidden="true"></span>
+                    } @else {
+                      <app-icon name="trash" />
+                    }
+                  </button>
+                </div>
               </article>
             </li>
           } @empty {

@@ -268,3 +268,40 @@ Dans le projet fais ceci présente les morceau sous forme de cards responsives e
 | `frontend-starter/src/app/components/tracks-page/tracks-page.ts` | Import des trois pipes dans `imports` du composant. Aucune logique modifiée. |
 | `frontend-starter/src/app/components/tracks-page/tracks-page.html` | La liste de lignes `<div class="track">` est remplacée par une liste `<ul>` / `<li>` de cards `<article>`. Chaque card contient : une vignette décorative (`aria-hidden`) ; le titre en `<h3>`, relié à la card par `aria-labelledby` ; le nom original ; une liste de définitions `<dl>` (Format, Taille, Ajouté le), avec la date dans une balise `<time datetime>` ; le bouton de lecture avec `aria-label="Lire <titre>"`. Un titre trop long est coupé avec « … », et le texte complet reste visible au survol (`title`). L'état vide devient un message « Aucune piste pour l'instant… ». Correction : la taille était affichée en « Ko » alors que la valeur est en octets. |
 | `frontend-starter/src/app/components/tracks-page/tracks-page.css` | Styles des cards. **Responsive** : grille `repeat(auto-fill, minmax(260px, 1fr))`, qui passe de 1 à plusieurs colonnes selon la largeur, sans media query. **Mise en forme** : vignette dégradée, badge de format, métadonnées en ligne qui passent à la ligne si besoin. **Accessibilité** : la bordure et l'ombre de la card réagissent aussi à `:focus-within`, ce qui rend visible la card dont le bouton a le focus clavier. L'état vide a une bordure en pointillés. |
+# TP3
+## Suppresion d'un stracks
+### Prompts
+Je souhaite que dans la page tracks tu ajoutes la suppresion on passant  par cette url du backend
+DELETE /api/tracks/:id
+voici ce qui se dans cette suppresion
+une action « Supprimer » dans chaque card ;
+une confirmation avant suppression ;
+un état de suppression pour éviter les doubles clics ;
+un message de succès ou d’erreur (composant Angular SnackBar);
+Mise à jour du contenu de la page après suppression ;
+la gestion du cas où la piste n’existe plus (elle est affichée à l'écran mais a été supprimée entre temps, par exemple dans un autre onglet) ou n’appartient pas à l’utilisateur.
+Et elle doit passer par trckservice
+
+### Changement
+| Fichier modifié | Modifications faites |
+|---|---|
+| `frontend-starter/src/app/shared/services/track.service.ts` | Nouvelle méthode `remove(id)`, qui envoie `DELETE /api/tracks/:id`. Le composant n'appelle jamais `HttpClient` directement. Nouvelle classe `TrackRemovalError` (message affichable + indicateur `trackGone`), produite par `removalError()` selon la réponse. **404** : « Ce morceau n'existe plus ou ne vous appartient pas… », avec `trackGone = true`. Le backend filtre sur `ownerId`, donc une piste supprimée entre-temps et une piste d'un autre utilisateur donnent la même réponse, ce qui évite de révéler l'existence de la piste d'un autre. **500 « Métadonnée supprimée… »** : la piste a quitté la bibliothèque mais son fichier reste sur le disque, donc `trackGone = true`. **Autres erreurs** : message de `httpErrorMessage()` et `trackGone = false`. |
+| `frontend-starter/src/app/shared/components/confirm-dialog/confirm-dialog.ts` (nouveau) | Composant de confirmation réutilisable, basé sur `MatDialog`. Il reçoit un titre, un message et le libellé du bouton de confirmation, et se ferme avec `true` (confirmé) ou `false` (annulé). Le focus initial est sur « Annuler » (`cdkFocusInitial`), pour qu'Entrée ne supprime jamais par erreur. Échap ou un clic en dehors annulent. |
+| `frontend-starter/src/app/components/tracks-page/tracks-page.ts` | Injection de `MatDialog` et `MatSnackBar` avec `inject()`. Signal `deletingIds` : l'ensemble des pistes dont la suppression est en cours. `remove(track)` ignore le clic si la piste est déjà en cours de suppression, sinon ouvre la confirmation. `deleteTrack()` appelle `TrackService.remove()`, affiche le succès ou l'erreur avec `notify()` (SnackBar vert 4 s ou rouge 8 s), et recharge la liste en cas de succès ou si `trackGone` est vrai. `refreshAfterRemoval()` recharge la page courante, ou la page précédente si la dernière card d'une page > 1 vient d'être supprimée. |
+| `frontend-starter/src/app/components/tracks-page/tracks-page.html` | Dans chaque card, un bloc `track-actions` regroupe le bouton Lire et le nouveau bouton Supprimer (icône corbeille, `aria-label="Supprimer <titre>"`). Pendant la suppression, les deux boutons sont désactivés, la corbeille devient un spinner, l'`aria-label` devient « Suppression en cours de <titre> », et la card reçoit la classe `deleting` et `aria-busy="true"`. |
+| `frontend-starter/src/app/components/tracks-page/tracks-page.css` | Boutons d'action empilés verticalement (`.track-actions`), card semi-transparente pendant la suppression (`.track-card.deleting`), spinner rouge (`.spinner.dark`). |
+| `frontend-starter/src/app/shared/components/icon/icon.ts` | Ajout de l'icône `trash`. |
+| `frontend-starter/src/styles.css` | Boutons de danger : `.btn-danger` (rouge plein, pour la confirmation) et `.btn-danger-ghost` (rouge clair, pour la card). Couleurs du SnackBar selon `panelClass` : `.snack-success` (vert) et `.snack-error` (rouge), via les variables CSS de Material. |
+
+### Soucis
+Lors de la lecture si on joue un morceau et qu'on le supprime la musique fonctionne encore
+
+Raison: a cause du bouton play tout le fichier est téléchargé dans un Blob en mémoire du navigateur, et audio lit cette copie locale (blob:http://…). Supprimer le fichier sur le serveur n'a donc aucun effet sur la copie déjà téléchargée. Il faut arrêter la lecture côté Angular quand le morceau supprimé est celui qui joue.
+
+### Solution 
+Au clic sur ▶, HttpClient télécharge tout le fichier dans un Blob en mémoire du navigateur, puis audio lit cette copie locale (blob:http://…). La suppression efface le fichier sur le serveur, mais pas cette copie : le lecteur ne contacte plus le serveur et continue donc à jouer.
+
+**Changement**
+| Fichier modifié | Modifications faites |
+|---|---|
+| `frontend-starter/src/app/components/tracks-page/tracks-page.ts` | Nouveau Signal privé `playingTrackId`, qui retient l'id du morceau chargé dans le lecteur. Il est rempli dans `play()` quand le `Blob` est reçu. Nouvelle méthode `stopPlaybackOf(trackId)` : si le morceau supprimé est celui en lecture, elle révoque l'`ObjectURL` (`URL.revokeObjectURL`, qui libère le `Blob` en mémoire), vide `audioUrl` et remet `playingTrackId` à `null`. Comme le lecteur est affiché avec `@if (audioUrl())`, vider `audioUrl` retire `<audio>` de la page, et le navigateur met automatiquement en pause un élément média retiré du document. `stopPlaybackOf()` est appelée dans `deleteTrack()` après une suppression réussie (`204`), et aussi en erreur quand `trackGone` est vrai (`404` piste déjà supprimée, ou `500` « métadonnée supprimée »). Si on supprime un autre morceau que celui en lecture, la lecture continue normalement. |

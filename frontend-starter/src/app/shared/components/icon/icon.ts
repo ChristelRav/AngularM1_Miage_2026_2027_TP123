@@ -13,7 +13,8 @@ export type IconName =
   | 'chevron-left'
   | 'chevron-right'
   | 'save'
-  | 'alert';
+  | 'alert'
+  | 'trash';
 
 /** Inline stroke icon that inherits the surrounding text color and size. */
 @Component({
@@ -79,6 +80,12 @@ export type IconName =
         @case ('save') {
           <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
           <path d="M17 21v-8H7v8M7 3v5h8" />
+        }
+        @case ('trash') {
+          <path d="M3 6h18" />
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+          <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          <path d="M10 11v6M14 11v6" />
         }
         @case ('alert') {
           <circle cx="12" cy="12" r="10" />

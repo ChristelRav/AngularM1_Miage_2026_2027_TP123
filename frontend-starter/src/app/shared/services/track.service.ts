@@ -31,6 +31,43 @@ export class TrackService {
       responseType: 'blob',
     });
   }
+
+  /** Errors are emitted as `TrackRemovalError`, whose message can be shown as is. */
+  remove(id: string) {
+    return this.http
+      .delete<void>(`/api/tracks/${id}`)
+      .pipe(catchError((error: unknown) => throwError(() => removalError(error))));
+  }
+}
+
+/** Removal failure; `trackGone` tells whether the track is no longer in the library anyway. */
+export class TrackRemovalError extends Error {
+  constructor(
+    message: string,
+    readonly trackGone: boolean,
+  ) {
+    super(message);
+  }
+}
+
+function removalError(error: unknown): TrackRemovalError {
+  if (error instanceof HttpErrorResponse) {
+    // The backend filters on ownerId: a deleted track and someone else's track both give 404.
+    if (error.status === 404) {
+      return new TrackRemovalError(
+        'Ce morceau n’existe plus ou ne vous appartient pas. La liste a été mise à jour.',
+        true,
+      );
+    }
+    // 500 "Métadonnée supprimée, mais fichier audio non supprimé": gone from the library.
+    if (error.status === 500 && error.error?.message?.startsWith('Métadonnée supprimée')) {
+      return new TrackRemovalError(
+        'Le morceau a été retiré de la bibliothèque, mais son fichier n’a pas pu être effacé du serveur.',
+        true,
+      );
+    }
+  }
+  return new TrackRemovalError(httpErrorMessage(error), false);
 }
 
 /** Multer answers "File too large" in English: translate the known server messages. */
