@@ -146,3 +146,32 @@ Les deux contrôles reposent sur le type MIME **déclaré** par le navigateur, d
 En résumé : le serveur **streame** bien le fichier, mais `HttpClient` **reconstitue un Blob complet** avant de le donner au lecteur. On perd le démarrage progressif que permettrait le buffering natif de `<audio>`. C'est le prix à payer pour envoyer le header `Authorization`, qu'une URL placée dans `src` ne peut pas porter (voir section 4).
 
 Pour retrouver une lecture progressive tout en restant authentifié, il faudrait une autre solution d'authentification de la requête média : un cookie `HttpOnly`, ou une URL signée à durée de vie courte générée par le backend. Ces deux solutions modifieraient le contrat HTTP, ce que la mission interdit.
+
+
+### 10-Réponse aux questions de buffering et streaming
+
+**Le backend envoie-t-il le fichier entier en mémoire ou peut-il l'envoyer progressivement depuis le disque ?**
+
+Il l'envoie progressivement. La route `GET /api/tracks/:id/audio` utilise `res.sendFile()` ([app.js:394](backend/src/app.js#L394)), qui lit le fichier sur le disque morceau par morceau et l'envoie au fur et à mesure. Le serveur ne charge donc jamais tout le fichier dans sa RAM. Il gère aussi les requêtes `Range`, ce qui permet de demander juste une partie du fichier.
+
+**Avec `HttpClient` et `responseType: "blob"`, à quel moment le composant reçoit-il généralement le fichier ?**
+
+Seulement à la fin, une fois que tout le fichier est téléchargé. Même si le serveur envoie par morceaux, `HttpClient` attend d'avoir tout reçu pour construire le `Blob`, et c'est seulement là que le `subscribe` de `play()` est appelé. Pour un gros fichier ou une connexion lente, on attend donc un moment avant que la musique démarre.
+
+**Si la bibliothèque contient 100 morceaux, les 100 fichiers audio sont-ils chargés en mémoire dès l'affichage de la liste ?**
+
+Non. Quand on affiche la liste, `load()` appelle juste `GET /api/tracks?page=...&limit=...`, qui renvoie du JSON (titre, nom, taille, date...) et pas les fichiers audio. En plus, avec la pagination, on ne récupère que 5 morceaux à la fois, pas 100.
+
+Le fichier audio n'est téléchargé que quand on clique sur le bouton de lecture, dans `play(track)` qui appelle `service.audio(track.id)`. Et il n'y a qu'un seul `<audio>` dans la page ([tracks-page.html:100](frontend-starter/src/app/components/tracks-page/tracks-page.html#L100)). Au moment de lancer un nouveau morceau, on révoque l'ancienne URL avant d'en créer une nouvelle. Donc en mémoire on a au maximum un fichier audio à la fois.
+
+**Quelle différence y aurait-il avec 100 éléments `<audio>` utilisant directement une URL HTTP ?**
+
+Déjà, ça ne marcherait pas ici : `<audio src="...">` n'envoie pas le header `Authorization`, donc le backend répondrait `401`.
+
+Mais en imaginant que l'URL soit accessible, chaque `<audio>` pourrait commencer à charger son fichier tout seul dès l'affichage, selon l'attribut `preload` et le navigateur. Avec 100 lecteurs, on risque d'avoir plein de requêtes en même temps, alors que l'utilisateur n'en écoute qu'un.
+
+Par contre, il y a un avantage : le navigateur ferait du buffering. La lecture démarre dès qu'il a assez de données, sans attendre la fin du téléchargement, et on peut avancer dans le morceau grâce aux requêtes `Range`. Avec notre `Blob`, il faut tout télécharger avant d'écouter.
+
+**Pourquoi l'URL créée par `URL.createObjectURL` doit-elle être révoquée ?**
+
+Parce que tant que l'URL `blob:` existe, le navigateur garde le `Blob` en mémoire, même si on ne l'utilise plus. Si on ne fait jamais `revokeObjectURL`, chaque morceau écouté reste en mémoire jusqu'à la fermeture de l'onglet, et avec des fichiers de plusieurs Mo ça monte vite. C'est pour ça qu'on révoque l'ancienne URL dans `play()` avant d'en créer une nouvelle, et la dernière quand on quitte la page avec `DestroyRef.onDestroy()`.
