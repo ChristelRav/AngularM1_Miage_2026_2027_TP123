@@ -46,13 +46,15 @@
 .track-cover {
   display: grid;
   place-items: center;
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 4rem;
+  height: 4rem;
   font-size: 1.2rem;
   color: var(--green-900);
   background: linear-gradient(135deg, var(--accent), #f0a85a);
   border-radius: 10px;
+  overflow: hidden;
 }
+.track-cover img { width: 100%; height: 100%; object-fit: cover; }
 
 /* min-width: 0 lets long titles shrink and get an ellipsis instead of overflowing. */
 .track-body { min-width: 0; }

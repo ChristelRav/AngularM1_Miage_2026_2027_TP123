@@ -17,10 +17,11 @@ export class TrackService {
   }
 
   /** Errors are emitted as `Error` objects whose message can be shown as is. */
-  upload(file: File, title: string) {
+  upload(file: File, title: string, cover?: File | null) {
     const body = new FormData();
     body.append('audio', file);
     body.append('title', title);
+    if (cover) body.append('cover', cover);
     return this.http
       .post<Track>('/api/tracks', body)
       .pipe(catchError((error: unknown) => throwError(() => new Error(uploadErrorMessage(error)))));
@@ -28,6 +29,12 @@ export class TrackService {
 
   audio(id: string) {
     return this.http.get(`/api/tracks/${id}/audio`, {
+      responseType: 'blob',
+    });
+  }
+
+  cover(id: string) {
+    return this.http.get(`/api/tracks/${id}/cover`, {
       responseType: 'blob',
     });
   }
@@ -77,6 +84,9 @@ function uploadErrorMessage(error: unknown): string {
     if (message === 'File too large') return 'Fichier trop volumineux : 25 Mo maximum.';
     if (message === 'Format audio non accepté') {
       return 'Format refusé par le serveur. Formats acceptés : MP3, WAV, OGG ou M4A.';
+    }
+    if (message === 'Format image non accepté') {
+      return 'Format d’image refusé. Formats acceptés : JPEG, PNG ou WebP.';
     }
   }
   return httpErrorMessage(error);

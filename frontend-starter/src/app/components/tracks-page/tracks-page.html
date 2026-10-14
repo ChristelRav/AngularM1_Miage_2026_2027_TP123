@@ -16,6 +16,19 @@
         Fichier audio
         <input #fileInput type="file" accept="audio/*" (change)="choose($event)" [disabled]="uploading()" />
       </label>
+      <label>
+        Image de couverture (facultative)
+        <input
+          #coverInput
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          (change)="chooseCover($event)"
+          [disabled]="uploading()"
+        />
+      </label>
+      @if (cover(); as selectedCover) {
+        <p class="track-file">Couverture sélectionnée : {{ selectedCover.name }}</p>
+      }
       <button type="button" (click)="upload()" [disabled]="!file() || uploading()">
         @if (uploading()) {
           <span class="spinner" aria-hidden="true"></span>Envoi en cours…
@@ -58,7 +71,13 @@
                 [attr.aria-busy]="deletingIds().has(track.id)"
                 [attr.aria-labelledby]="'track-title-' + track.id"
               >
-                <div class="track-cover" aria-hidden="true"><app-icon name="music" /></div>
+                <div class="track-cover">
+                  @if (coverUrls()[track.id]) {
+                    <img [src]="coverUrls()[track.id]" [alt]="'Couverture de ' + track.title" />
+                  } @else {
+                    <span aria-hidden="true"><app-icon name="music" /></span>
+                  }
+                </div>
                 <div class="track-body">
                   <h3 [id]="'track-title-' + track.id" [title]="track.title">{{ track.title }}</h3>
                   <p class="track-file" [title]="track.originalName">{{ track.originalName }}</p>

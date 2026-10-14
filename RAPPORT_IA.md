@@ -305,3 +305,22 @@ Au clic sur ▶, HttpClient télécharge tout le fichier dans un Blob en mémoir
 | Fichier modifié | Modifications faites |
 |---|---|
 | `frontend-starter/src/app/components/tracks-page/tracks-page.ts` | Nouveau Signal privé `playingTrackId`, qui retient l'id du morceau chargé dans le lecteur. Il est rempli dans `play()` quand le `Blob` est reçu. Nouvelle méthode `stopPlaybackOf(trackId)` : si le morceau supprimé est celui en lecture, elle révoque l'`ObjectURL` (`URL.revokeObjectURL`, qui libère le `Blob` en mémoire), vide `audioUrl` et remet `playingTrackId` à `null`. Comme le lecteur est affiché avec `@if (audioUrl())`, vider `audioUrl` retire `<audio>` de la page, et le navigateur met automatiquement en pause un élément média retiré du document. `stopPlaybackOf()` est appelée dans `deleteTrack()` après une suppression réussie (`204`), et aussi en erreur quand `trackGone` est vrai (`404` piste déjà supprimée, ou `500` « métadonnée supprimée »). Si on supprime un autre morceau que celui en lecture, la lecture continue normalement. |
+
+# TP3
+## Image de couverture des morceaux
+
+### Demande
+Ajouter, depuis la page `tracks`, la possibilité de joindre une image de couverture au moment de l'import d'un morceau.
+
+### Changement
+| Fichier modifié | Modifications faites |
+|---|---|
+| `frontend-starter/src/app/components/tracks-page/tracks-page.html` et `.css` | Le formulaire d'import propose un champ image facultatif (JPEG, PNG ou WebP) et chaque carte montre la couverture reçue ou l'icône existante en remplacement. |
+| `frontend-starter/src/app/components/tracks-page/tracks-page.ts` | La couverture sélectionnée est transmise avec l'audio. Les couvertures sont chargées en Blob via le service HTTP authentifié puis libérées au rechargement et à la destruction du composant. |
+| `frontend-starter/src/app/shared/services/track.service.ts` et `shared/models/track.model.ts` | L'upload multipart ajoute le champ `cover` si une image est choisie; le modèle expose l'URL facultative `coverUrl`, et le service ajoute la récupération authentifiée de la couverture. |
+| `backend/src/app.js` et `backend/src/models/Track.js` | L'API accepte l'image optionnelle, vérifie son type MIME, stocke ses métadonnées sans exposer son nom interne, ajoute une route protégée pour servir la couverture et supprime le fichier avec la piste. Les anciennes pistes et les imports sans image restent compatibles. |
+| `API_CONTRACT.md` | Le contrat documente le champ multipart `cover` ainsi que la route de lecture de la couverture. |
+| `backend/test/api.test.js` | Vérifie le `coverUrl` public d'une piste avec ou sans image. |
+
+### Vérification
+Les diagnostics TypeScript des fichiers Angular modifiés ne signalent aucune erreur. Les tests backend et le build/tests Angular n'ont pas pu être exécutés : l'autorisation d'exécuter les commandes a été refusée.

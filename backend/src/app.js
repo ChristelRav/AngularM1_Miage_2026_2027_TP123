@@ -39,6 +39,19 @@ const allowed = new Set([
   "audio/mp4",
   "audio/x-m4a",
 ]);
+const allowedCovers = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+async function removeUploadedFiles(files, context) {
+  for (const file of Object.values(files ?? {}).flat()) {
+    const uploadedPath = path.join(UPLOADS, file.filename);
+    try {
+      await fsPromises.unlink(uploadedPath);
+      console.log(`[${context}] Fichier temporaire supprimé : ${uploadedPath}`);
+    } catch (error) {
+      console.error(`[${context}] Impossible de supprimer le fichier ${uploadedPath}`, error);
+    }
+  }
+}
 
 /**
  * Crée un jeton JWT contenant uniquement l'identité nécessaire à l'API.
@@ -107,13 +120,15 @@ const upload = multer({
   storage,
   limits: { fileSize: MAX_FILE_SIZE },
   fileFilter: (_request, file, callback) => {
-    // Seuls les types MIME audio demandés dans le sujet sont acceptés.
-    if (allowed.has(file.mimetype)) {
-      console.log(`[multer] Type accepté : ${file.mimetype}`);
+    const acceptedTypes = file.fieldname === "cover" ? allowedCovers : allowed;
+    if (acceptedTypes.has(file.mimetype)) {
+      console.log(`[multer] Type accepté pour ${file.fieldname} : ${file.mimetype}`);
       return callback(null, true);
     }
 
-    const error = new Error("Format audio non accepté");
+    const error = new Error(
+      file.fieldname === "cover" ? "Format image non accepté" : "Format audio non accepté",
+    );
     console.error(`[multer] Type refusé : ${file.mimetype}`, error);
     return callback(error);
   },
@@ -287,7 +302,7 @@ export function createApp() {
           .sort({ createdAt: -1 })
           .skip((page - 1) * limit)
           .limit(limit)
-          .select("-storedName")
+          .select("-storedName -coverStoredName")
           .lean(),
         Track.countDocuments(filter),
       ]);
@@ -300,6 +315,7 @@ export function createApp() {
       const publicItems = items.map((track) => ({
         ...track,
         id: String(track._id),
+        coverUrl: track.coverMimeType ? `/api/tracks/${String(track._id)}/cover` : null,
         _id: undefined,
       }));
 
@@ -321,34 +337,42 @@ export function createApp() {
   });
 
   /**
-   * Reçoit le champ multipart audio et le champ texte title.
-   * upload.single("audio") traite un seul fichier et le place dans req.file,
-   * tandis que req.body.title contient le champ texte associé.
+   * Reçoit les champs multipart audio, cover (facultatif) et le champ texte title.
+   * Multer place les fichiers dans req.files et les champs texte dans req.body.
    * C'est ici qu'est fait l'upload de fichiers sur le serveur. 
    * Le middleware auth vérifie le JWT avant d'accepter l'upload.
-   * Le middleware upload.single("audio") traite le fichier audio envoyé dans le champ "audio" du formulaire
-   * ou de l'appel depuis le frontend avec un objet FormData.
+   * Le middleware traite les fichiers audio et de couverture envoyés par le formulaire.
    * Si le fichier est accepté, il est stocké sur le disque et ses métadonnées sont enregistrées 
    * dans MongoDB.
    */
   app.post(
     "/api/tracks",
     auth,
-    upload.single("audio"),
+    upload.fields([
+      { name: "audio", maxCount: 1 },
+      { name: "cover", maxCount: 1 },
+    ]),
     async (req, res, next) => {
       try {
-        if (!req.file) {
+        const audioFile = req.files?.audio?.[0];
+        const coverFile = req.files?.cover?.[0];
+        if (!audioFile) {
+          await removeUploadedFiles(req.files, "tracks");
           console.warn(`[tracks] Upload sans fichier par ${req.auth.sub}`);
           return res.status(400).json({ message: "Fichier audio requis" });
         }
 
         const track = await Track.create({
           ownerId: req.auth.sub,
-          title: req.body.title || req.file.originalname,
-          originalName: req.file.originalname,
-          storedName: req.file.filename,
-          mimeType: req.file.mimetype,
-          size: req.file.size,
+          title: req.body.title || audioFile.originalname,
+          originalName: audioFile.originalname,
+          storedName: audioFile.filename,
+          mimeType: audioFile.mimetype,
+          size: audioFile.size,
+          ...(coverFile && {
+            coverStoredName: coverFile.filename,
+            coverMimeType: coverFile.mimetype,
+          }),
         });
 
         console.log(`[tracks] Upload enregistré : ${track.id}`);
@@ -358,22 +382,40 @@ export function createApp() {
 
         // Si MongoDB échoue après l'écriture sur disque, on tente de nettoyer
         // le fichier orphelin. L'erreur de nettoyage est elle aussi loguée.
-        if (req.file) {
-          const uploadedPath = path.join(UPLOADS, req.file.filename);
-          try {
-            await fsPromises.unlink(uploadedPath);
-            console.log(`[tracks] Fichier temporaire supprimé : ${uploadedPath}`);
-          } catch (cleanupError) {
-            console.error(
-              `[tracks] Impossible de supprimer le fichier temporaire ${uploadedPath}`,
-              cleanupError,
-            );
-          }
-        }
+        await removeUploadedFiles(req.files, "tracks");
         next(error);
       }
     },
   );
+
+  /** Envoie l'image de couverture d'une piste après vérification de sa propriété. */
+  app.get("/api/tracks/:id/cover", auth, async (req, res, next) => {
+    try {
+      const track = await Track.findOne({
+        _id: req.params.id,
+        ownerId: req.auth.sub,
+      }).select("+coverStoredName");
+
+      if (!track?.coverStoredName) {
+        console.warn(`[tracks] Couverture introuvable ou interdite : ${req.params.id}`);
+        return res.status(404).json({ message: "Couverture inconnue" });
+      }
+
+      const coverPath = path.join(UPLOADS, track.coverStoredName);
+      res.type(track.coverMimeType);
+      res.sendFile(coverPath, (error) => {
+        if (error) {
+          console.error(`[tracks] Erreur d'envoi de la couverture ${track.id}`, error);
+          if (!res.headersSent) next(error);
+          return;
+        }
+        console.log(`[tracks] Couverture envoyée : ${track.id}`);
+      });
+    } catch (error) {
+      console.error("[tracks] Erreur de préparation de la couverture", error);
+      next(error);
+    }
+  });
 
   /** Envoie le contenu binaire d'une piste après vérification de sa propriété. */
   app.get("/api/tracks/:id/audio", auth, async (req, res, next) => {
@@ -411,23 +453,28 @@ export function createApp() {
       const track = await Track.findOneAndDelete({
         _id: req.params.id,
         ownerId: req.auth.sub,
-      }).select("+storedName");
+      }).select("+storedName +coverStoredName");
 
       if (!track) {
         console.warn(`[tracks] Suppression impossible : ${req.params.id}`);
         return res.status(404).json({ message: "Piste inconnue" });
       }
 
-      const audioPath = path.join(UPLOADS, track.storedName);
-      try {
-        await fsPromises.unlink(audioPath);
-        console.log(`[tracks] Fichier supprimé : ${audioPath}`);
-      } catch (error) {
-        // L'exception n'est volontairement pas ignorée : l'administrateur doit
-        // voir ce fichier orphelin si sa suppression échoue.
-        console.error(`[tracks] Fichier audio non supprimé : ${audioPath}`, error);
+      const storedFiles = [track.storedName, track.coverStoredName].filter(Boolean);
+      const failedFiles = [];
+      for (const storedName of storedFiles) {
+        const storedPath = path.join(UPLOADS, storedName);
+        try {
+          await fsPromises.unlink(storedPath);
+          console.log(`[tracks] Fichier supprimé : ${storedPath}`);
+        } catch (error) {
+          failedFiles.push(storedPath);
+          console.error(`[tracks] Fichier non supprimé : ${storedPath}`, error);
+        }
+      }
+      if (failedFiles.length) {
         return res.status(500).json({
-          message: "Métadonnée supprimée, mais fichier audio non supprimé",
+          message: "Métadonnée supprimée, mais un ou plusieurs fichiers associés non supprimés",
         });
       }
 
@@ -444,7 +491,8 @@ export function createApp() {
 
     if (
       error instanceof multer.MulterError ||
-      error?.message === "Format audio non accepté"
+      error?.message === "Format audio non accepté" ||
+      error?.message === "Format image non accepté"
     ) {
       return res.status(400).json({ message: error.message });
     }

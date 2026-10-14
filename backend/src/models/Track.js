@@ -18,6 +18,8 @@ const schema = new mongoose.Schema(
     storedName: { type: String, required: true, select: false },
     mimeType: { type: String, required: true },
     size: { type: Number, required: true, min: 0 },
+    coverStoredName: { type: String, select: false },
+    coverMimeType: { type: String },
   },
   { timestamps: true },
 );
@@ -39,6 +41,7 @@ schema.methods.toPublic = function () {
     mimeType: this.mimeType,
     size: this.size,
     createdAt: this.createdAt,
+    coverUrl: this.coverStoredName ? `/api/tracks/${this.id}/cover` : null,
   };
 };
 

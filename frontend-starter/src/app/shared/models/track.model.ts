@@ -6,4 +6,5 @@ export interface Track {
   mimeType: string;
   size: number;
   createdAt: string;
+  coverUrl?: string | null;
 }
