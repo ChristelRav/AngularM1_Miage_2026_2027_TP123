@@ -1,4 +1,5 @@
-import { Component, ElementRef, inject, OnDestroy, signal, viewChild } from '@angular/core';
+import { HttpEventType } from '@angular/common/http';
+import { Component, computed, ElementRef, inject, OnDestroy, signal, viewChild } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { IconComponent } from '../../shared/components/icon/icon';
 import { MatDialog } from '@angular/material/dialog';
@@ -12,6 +13,16 @@ import { Track } from '../../shared/models/track.model';
 import { AudioFormatPipe, FileSizePipe, ShortDatePipe } from '../../shared/pipes/track-format.pipes';
 import { TrackRemovalError, TrackService } from '../../shared/services/track.service';
 import { httpErrorMessage } from '../../shared/utils/http-error';
+
+/**
+ * Upload lifecycle. While uploading, `progress` is a percentage, or null when the
+ * browser cannot tell the total size; at 100 % the server is still processing the file.
+ */
+export type UploadState =
+  | { status: 'idle' }
+  | { status: 'uploading'; progress: number | null }
+  | { status: 'success'; message: string }
+  | { status: 'error'; message: string };
 
 @Component({
   imports: [
@@ -59,9 +70,8 @@ export class TracksPageComponent implements OnDestroy {
   readonly title = new FormControl('', { nonNullable: true });
   readonly file = signal<File | null>(null);
   readonly cover = signal<File | null>(null);
-  readonly uploading = signal(false);
-  readonly uploadError = signal<string | null>(null);
-  readonly uploadSuccess = signal<string | null>(null);
+  readonly uploadState = signal<UploadState>({ status: 'idle' });
+  readonly uploading = computed(() => this.uploadState().status === 'uploading');
   private readonly fileInput = viewChild.required<ElementRef<HTMLInputElement>>('fileInput');
   private readonly coverInput = viewChild.required<ElementRef<HTMLInputElement>>('coverInput');
   /** Ids of the tracks whose DELETE request is in flight. */
@@ -74,8 +84,7 @@ export class TracksPageComponent implements OnDestroy {
 
   choose(event: Event): void {
     this.file.set((event.target as HTMLInputElement).files?.[0] ?? null);
-    this.uploadError.set(null);
-    this.uploadSuccess.set(null);
+    this.uploadState.set({ status: 'idle' });
     console.debug('[TracksPage] Fichier sélectionné', this.file()?.name);
   }
 
@@ -127,21 +136,26 @@ export class TracksPageComponent implements OnDestroy {
     // Guard against double submissions while a request is in flight.
     if (!file || this.uploading()) return;
 
-    this.uploading.set(true);
-    this.uploadError.set(null);
-    this.uploadSuccess.set(null);
+    this.uploadState.set({ status: 'uploading', progress: 0 });
 
     this.service.upload(file, this.title.value.trim() || file.name, this.cover()).subscribe({
-      next: (track) => {
-        console.debug('[TracksPage] Piste envoyée', track.id);
-        this.uploading.set(false);
-        this.uploadSuccess.set(`« ${track.title} » a bien été ajouté à votre bibliothèque.`);
-        this.resetUploadForm();
-        this.go(1);
+      next: (event) => {
+        if (event.type === HttpEventType.UploadProgress) {
+          const progress = event.total ? Math.round((100 * event.loaded) / event.total) : null;
+          this.uploadState.set({ status: 'uploading', progress });
+        } else if (event.type === HttpEventType.Response && event.body) {
+          const track = event.body;
+          console.debug('[TracksPage] Piste envoyée', track.id);
+          this.uploadState.set({
+            status: 'success',
+            message: `« ${track.title} » a bien été ajouté à votre bibliothèque.`,
+          });
+          this.resetUploadForm();
+          this.go(1);
+        }
       },
       error: (error: Error) => {
-        this.uploading.set(false);
-        this.uploadError.set(error.message);
+        this.uploadState.set({ status: 'error', message: error.message });
       },
     });
   }

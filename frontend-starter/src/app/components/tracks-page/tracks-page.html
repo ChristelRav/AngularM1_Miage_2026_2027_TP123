@@ -37,13 +37,29 @@
         }
       </button>
 
-      <div aria-live="polite">
-        @if (uploadSuccess(); as message) {
-          <p class="success">{{ message }}</p>
+      @let state = uploadState();
+      <div class="upload-status" aria-live="polite">
+        @if (state.status === 'idle') {
+          <p class="upload-idle">Aucun envoi en cours.</p>
+        } @else if (state.status === 'uploading') {
+          <label class="upload-progress">
+            <span>
+              @if (state.progress === null) {
+                Envoi en cours…
+              } @else if (state.progress < 100) {
+                Envoi en cours : {{ state.progress }} %
+              } @else {
+                Fichier envoyé, traitement par le serveur…
+              }
+            </span>
+            <progress max="100" [attr.value]="state.progress"></progress>
+          </label>
+        } @else if (state.status === 'success') {
+          <p class="success">{{ state.message }}</p>
         }
       </div>
-      @if (uploadError(); as message) {
-        <p class="error" role="alert"><app-icon name="alert" />{{ message }}</p>
+      @if (state.status === 'error') {
+        <p class="error" role="alert"><app-icon name="alert" />{{ state.message }}</p>
       }
     </article>
 

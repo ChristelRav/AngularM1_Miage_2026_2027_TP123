@@ -16,14 +16,18 @@ export class TrackService {
     });
   }
 
-  /** Errors are emitted as `Error` objects whose message can be shown as is. */
+  /**
+   * Emits every HTTP event of the request (upload progress, then the response) so the
+   * caller can follow the upload. Errors are emitted as `Error` objects whose message
+   * can be shown as is.
+   */
   upload(file: File, title: string, cover?: File | null) {
     const body = new FormData();
     body.append('audio', file);
     body.append('title', title);
     if (cover) body.append('cover', cover);
     return this.http
-      .post<Track>('/api/tracks', body)
+      .post<Track>('/api/tracks', body, { reportUploadProgress: true, observe: 'events' })
       .pipe(catchError((error: unknown) => throwError(() => new Error(uploadErrorMessage(error)))));
   }
 

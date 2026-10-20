@@ -324,3 +324,29 @@ Ajouter, depuis la page `tracks`, la possibilité de joindre une image de couver
 
 ### Vérification
 Les diagnostics TypeScript des fichiers Angular modifiés ne signalent aucune erreur. Les tests backend et le build/tests Angular n'ont pas pu être exécutés : l'autorisation d'exécuter les commandes a été refusée.
+
+
+## Mission :Progression de l’upload
+### Prompt
+Dans l'upload je veux afficher sa progression  en utiliisant  les événements HTTP Angular et ditinguer au minimum:
+l’absence d’upload en cours ;
+l’upload en cours avec un pourcentage ;
+la réussite ;
+l’échec.
+### Changement
+| Fichier modifié | Modifications faites |
+|---|---|
+| `frontend-starter/src/main.ts` | Ajout de `withXhr()` dans `provideHttpClient()`. Depuis Angular 21, `HttpClient` utilise l'API `fetch` par défaut, et `fetch` ne sait pas mesurer la progression d'un **envoi** : sans ce changement, aucun événement `UploadProgress` n'est émis et la barre reste bloquée à 0 %. Avec `withXhr()`, Angular passe par `XMLHttpRequest`, dont l'objet `xhr.upload` signale l'avancement de l'envoi. |
+| `frontend-starter/src/app/shared/services/track.service.ts` | `upload()` envoie la requête `POST /api/tracks` avec les options `reportUploadProgress: true` et `observe: 'events'`. On utilise `reportUploadProgress` parce que `reportProgress` est déprécié depuis Angular 22. Le service renvoie donc le flux des `HttpEvent` : les événements `UploadProgress` pendant l'envoi, puis la `Response` qui contient le `Track` créé. La traduction des erreurs serveur en messages français ne change pas. |
+| `frontend-starter/src/app/components/tracks-page/tracks-page.ts` | Ajout du type `UploadState`, une union discriminée : `idle`, `uploading` (avec `progress`), `success` (avec `message`) et `error` (avec `message`). Un seul signal `uploadState` remplace les trois signaux `uploading`, `uploadError` et `uploadSuccess`, ce qui rend impossibles les états contradictoires. `uploading` devient un `computed` et sert toujours à désactiver les champs et le bouton. Dans `upload()`, un événement `HttpEventType.UploadProgress` donne le pourcentage `loaded / total`. Si le navigateur ne connaît pas `total`, le pourcentage vaut `null`. Un événement `HttpEventType.Response` fait passer à l'état `success`, réinitialise le formulaire et recharge la page 1. Choisir un nouveau fichier ramène l'état à `idle`. |
+| `frontend-starter/src/app/components/tracks-page/tracks-page.html` | Un bloc `@let state = uploadState()` suivi de `@if / @else if` affiche l'état courant, avec un typage strict : <br>• **aucun envoi** : « Aucun envoi en cours. » ; <br>• **envoi en cours** : « Envoi en cours : 42 % » et une barre native `<progress max="100">`. Sans taille connue, la barre est indéterminée (pas d'attribut `value`). À 100 %, le texte indique « Fichier envoyé, traitement par le serveur… », car le serveur doit encore enregistrer le fichier ; <br>• **réussite** : message vert avec le titre du morceau ; <br>• **échec** : message d'erreur avec `role="alert"`. <br>La zone d'état est en `aria-live="polite"`, donc les lecteurs d'écran annoncent la progression et la réussite. |
+| `frontend-starter/src/app/components/tracks-page/tracks-page.css` | Styles du texte d'attente (gris, discret) et de la barre de progression : pleine largeur, coins arrondis, couleurs du thème vert. Les pseudo-éléments `::-webkit-progress-*` (Chrome, Safari) et `::-moz-progress-bar` (Firefox) gèrent l'affichage selon le navigateur. |
+
+### Probleme vue
+La progression ne fonctionais pas alors voici les chenegment fait:
+
+main.ts : ajout ithXhr() pour qu'Angular utilise XMLHttpRequest, qui, lui, signale l'avancement de l'envoi :
+
+provideHttpClient(withXhr(), withInterceptors([authInterceptor])),
+
+track.service.ts : remplacement reportProgress: true par reportUploadProgress: true, car l'ancienne option est dépréciée depuis Angular 22.
