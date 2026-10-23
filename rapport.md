@@ -14,3 +14,23 @@ Pendant l'import d'un morceau, la page affiche maintenant la progression de l'en
 
 - `ng build` : compilation réussie, sans erreur de typage dans les templates.
 - Pour voir la progression en local, il faut ralentir le réseau dans les DevTools (onglet Network, profil « Slow 3G »), sinon l'envoi est presque instantané.
+
+# Rapport — Mode sombre
+
+L'application propose maintenant un mode sombre. Un bouton soleil / lune dans la barre de navigation passe d'un thème à l'autre. Au premier chargement, le thème suit la préférence du système (`prefers-color-scheme`). Dès que l'utilisateur choisit un thème, ce choix est enregistré dans le `localStorage` et réappliqué aux visites suivantes. Le backend et le contrat HTTP n'ont pas été modifiés.
+
+| Fichier modifié | Modifications faites |
+|---|---|
+| `frontend-starter/src/app/shared/services/theme.service.ts` (nouveau) | Service `providedIn: 'root'` qui expose un signal `theme` (`'light'` ou `'dark'`). La valeur de départ est le choix enregistré sous la clé `gpc_theme`, ou à défaut la préférence du système. Un `effect()` reporte le signal dans l'attribut `data-theme` de `<html>`. `toggle()` inverse le thème et l'enregistre. Comme dans `AuthService`, les accès au `localStorage` sont dans des `try/catch` : en navigation privée ou si le stockage est bloqué, le thème fonctionne quand même pendant la session. Le service n'enregistre rien tant que l'utilisateur n'a pas cliqué, donc un changement de préférence système est encore pris en compte. |
+| `frontend-starter/src/styles.css` | Les couleurs écrites en dur (`white`, `#fbfdfc`, `#e6efeb`, `#b8cbc5`…) sont remplacées par des **variables sémantiques** : `--bg`, `--surface`, `--surface-2`, `--line`, `--border`, `--text`, `--muted`, `--primary`, `--primary-fg`, `--primary-soft`, `--danger`, `--danger-fg`, `--shadow`, etc. Le bloc `:root[data-theme='dark']` redéfinit seulement ces variables. Aucune règle de composant n'est dupliquée. On distingue deux usages d'une même couleur : en **fond** sous du texte blanc (`--primary`, `--danger`) et en **texte** sur une carte (`--primary-fg`, `--danger-fg`). En sombre, le texte doit être plus clair pour respecter le contraste WCAG AA, alors que le fond des boutons doit rester assez foncé pour le texte blanc. `color-scheme: dark` adapte aussi les contrôles natifs : barres de défilement, lecteur `<audio>`, sélecteur de fichier. |
+| `frontend-starter/src/material-theme.scss` | Suppression de `color-scheme: light` sur `body`, qui forçait Angular Material en clair. Les couleurs Material (`--mat-sys-*`) passent par la fonction CSS `light-dark()` : en héritant du `color-scheme` de `<html>`, la boîte de dialogue de confirmation suit automatiquement le thème. |
+| `frontend-starter/src/index.html` | Petit script dans le `<head>` qui pose `data-theme` sur `<html>` **avant** le démarrage d'Angular. Sans lui, la page s'affiche brièvement en clair au rechargement (flash), le temps que le bundle se charge. Il lit la même clé `gpc_theme` et la même préférence système que le service. |
+| `frontend-starter/src/app/components/app/app.ts` / `app.html` / `app.css` | Injection de `ThemeService`. Un bouton `.nav-link.theme-toggle` est ajouté dans la navigation, avant Connexion / Déconnexion. Il affiche une lune en mode clair et un soleil en mode sombre. Comme il ne contient qu'une icône, un `aria-label` (« Activer le mode sombre » / « Activer le mode clair ») et un `title` le décrivent pour les lecteurs d'écran et au survol. |
+| `frontend-starter/src/app/shared/components/icon/icon.ts` | Ajout des icônes `sun` et `moon` au type `IconName` et au `@switch`. |
+| `frontend-starter/src/app/components/tracks-page/tracks-page.css` | Les cartes de pistes, la barre de progression, le message de réussite, les badges et le spinner de suppression utilisent les nouvelles variables à la place des couleurs fixes. La topbar, le hero et les couvertures dorées restent identiques dans les deux thèmes : ils sont déjà sombres ou contrastés. |
+
+## Vérification
+
+- `npm run build` : compilation réussie, sans erreur de typage dans les templates.
+- Dans le CSS généré, les variables Material utilisent bien `light-dark()`, donc elles suivent le `color-scheme` de la page.
+- Pour tester la préférence système sans cliquer : DevTools → menu ⋮ → *More tools* → *Rendering* → *Emulate CSS media feature prefers-color-scheme*, après avoir supprimé la clé `gpc_theme` dans l'onglet *Application* → *Local Storage*.

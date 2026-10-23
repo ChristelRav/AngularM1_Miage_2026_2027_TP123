@@ -14,6 +14,16 @@
     <a class="nav-link" routerLink="/profile" routerLinkActive="active" ariaCurrentWhenActive="page">
       <app-icon name="user" /><span class="nav-label">Profil</span>
     </a>
+    @let dark = theme.theme() === 'dark';
+    <button
+      type="button"
+      class="nav-link theme-toggle"
+      (click)="theme.toggle()"
+      [attr.aria-label]="dark ? 'Activer le mode clair' : 'Activer le mode sombre'"
+      [attr.title]="dark ? 'Mode clair' : 'Mode sombre'"
+    >
+      <app-icon [name]="dark ? 'sun' : 'moon'" />
+    </button>
     @if (auth.isAuthenticated()) {
       <button type="button" class="nav-link nav-cta" (click)="logout()">
         <app-icon name="logout" /><span class="nav-label">Déconnexion</span>

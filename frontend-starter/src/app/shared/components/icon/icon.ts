@@ -14,7 +14,9 @@ export type IconName =
   | 'chevron-right'
   | 'save'
   | 'alert'
-  | 'trash';
+  | 'trash'
+  | 'sun'
+  | 'moon';
 
 /** Inline stroke icon that inherits the surrounding text color and size. */
 @Component({
@@ -86,6 +88,13 @@ export type IconName =
           <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
           <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
           <path d="M10 11v6M14 11v6" />
+        }
+        @case ('sun') {
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+        }
+        @case ('moon') {
+          <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
         }
         @case ('alert') {
           <circle cx="12" cy="12" r="10" />

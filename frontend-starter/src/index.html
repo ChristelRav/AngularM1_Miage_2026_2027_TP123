@@ -8,7 +8,15 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Symbols+Outlined" rel="stylesheet">
-</head>
+    <!-- Applies the saved / system theme before Angular starts, to avoid a light flash. -->
+    <script>
+      try {
+        var t = localStorage.getItem('gpc_theme');
+        if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
+  </head>
   <body>
     <app-root></app-root>
   </body>

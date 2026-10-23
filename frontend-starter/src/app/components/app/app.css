@@ -54,6 +54,8 @@ nav { display: flex; align-items: center; gap: 0.4rem; }
 .nav-link:hover { color: white; background: #ffffff1f; }
 .nav-link.active { color: white; background: #ffffff2e; border-color: #ffffff40; }
 
+.theme-toggle { padding: 0.55rem; font-size: 1.05rem; }
+
 .nav-cta { margin-left: 0.4rem; color: var(--green-900); background: var(--accent); }
 .nav-cta:hover, .nav-cta.active { color: var(--green-900); background: var(--accent-hover); border-color: transparent; }
 

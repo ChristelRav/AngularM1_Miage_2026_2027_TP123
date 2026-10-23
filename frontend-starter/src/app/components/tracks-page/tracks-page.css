@@ -2,8 +2,8 @@
 
 .success {
   padding: 0.75rem 1rem;
-  color: var(--green-700);
-  background: var(--green-100);
+  color: var(--primary-soft-fg);
+  background: var(--primary-soft);
   border-radius: 10px;
 }
 
@@ -27,13 +27,13 @@
   height: 0.6rem;
   overflow: hidden;
   appearance: none;
-  background: var(--green-100);
+  background: var(--primary-soft);
   border: none;
   border-radius: 999px;
 }
-.upload-progress progress::-webkit-progress-bar { background: var(--green-100); }
-.upload-progress progress::-webkit-progress-value { background: var(--green-600); border-radius: 999px; }
-.upload-progress progress::-moz-progress-bar { background: var(--green-600); border-radius: 999px; }
+.upload-progress progress::-webkit-progress-bar { background: var(--primary-soft); }
+.upload-progress progress::-webkit-progress-value { background: var(--primary); border-radius: 999px; }
+.upload-progress progress::-moz-progress-bar { background: var(--primary); border-radius: 999px; }
 
 /* ---------- Track cards ---------- */
 .track-grid {
@@ -52,13 +52,13 @@
   gap: 0.85rem;
   height: 100%;
   padding: 1rem;
-  background: #fbfdfc;
-  border: 1px solid #e1ebe7;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
   border-radius: 12px;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .track-card:hover,
-.track-card:focus-within { border-color: #b8cbc5; box-shadow: 0 6px 18px #17312a14; }
+.track-card:focus-within { border-color: var(--border-hover); box-shadow: var(--shadow-hover); }
 
 .track-cover {
   display: grid;
@@ -100,8 +100,8 @@
   padding: 0.1rem 0.45rem;
   font-size: 0.72rem;
   letter-spacing: 0.04em;
-  color: var(--green-700);
-  background: var(--green-100);
+  color: var(--primary-soft-fg);
+  background: var(--primary-soft);
   border-radius: 6px;
 }
 
@@ -117,4 +117,4 @@
 /* ---------- Card actions (play / delete) ---------- */
 .track-actions { display: flex; flex-direction: column; gap: 0.4rem; }
 .track-card.deleting { opacity: 0.55; }
-.spinner.dark { border-color: var(--border); border-top-color: var(--danger); }
+.spinner.dark { border-color: var(--border); border-top-color: var(--danger-fg); }
