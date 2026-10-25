@@ -2,8 +2,8 @@
 
 .success {
   padding: 0.75rem 1rem;
-  color: var(--primary-soft-fg);
-  background: var(--primary-soft);
+  color: var(--success-fg);
+  background: var(--success-bg);
   border-radius: 10px;
 }
 
@@ -66,7 +66,7 @@
   width: 4rem;
   height: 4rem;
   font-size: 1.2rem;
-  color: var(--green-900);
+  color: var(--blue-900);
   background: linear-gradient(135deg, var(--accent), #f0a85a);
   border-radius: 10px;
   overflow: hidden;

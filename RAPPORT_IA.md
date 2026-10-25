@@ -365,3 +365,12 @@ Ajoute le mode sombre dans le projet
 | `frontend-starter/src/app/components/app/app.ts` / `app.html` / `app.css` | Injection de `ThemeService`. Un bouton `.nav-link.theme-toggle` est ajouté dans la navigation, avant Connexion / Déconnexion. Il affiche une lune en mode clair et un soleil en mode sombre. Comme il ne contient qu'une icône, un `aria-label` (« Activer le mode sombre » / « Activer le mode clair ») et un `title` le décrivent pour les lecteurs d'écran et au survol. |
 | `frontend-starter/src/app/shared/components/icon/icon.ts` | Ajout des icônes `sun` et `moon` au type `IconName` et au `@switch`. |
 | `frontend-starter/src/app/components/tracks-page/tracks-page.css` | Les cartes de pistes, la barre de progression, le message de réussite, les badges et le spinner de suppression utilisent les nouvelles variables à la place des couleurs fixes. La topbar, le hero et les couvertures dorées restent identiques dans les deux thèmes : ils sont déjà sombres ou contrastés. |
+# Changement de theme en bleu
+## Prompt 
+je souhaite que tu changes le theme en bleu
+## Changement
+| Fichier modifié | Modifications faites |
+|---|---|
+| `frontend-starter/src/styles.css` | La palette `--green-*` est renommée `--blue-*` avec de nouvelles valeurs, de `--blue-900: #0b1f3a` (topbar) à `--blue-50: #f3f6fb` (fond de page). Les variables sémantiques des deux thèmes (`--bg`, `--surface`, `--border`, `--text`, `--muted`, `--primary`, `--primary-fg`, `--primary-soft`, `--hero-end`, `--shadow`…) prennent des teintes bleutées. Les halos de focus et les ombres des boutons, écrits en dur, suivent la nouvelle couleur. Ajout de `--success-fg` / `--success-bg` : le message de réussite reste **vert**, parce qu'une réussite doit se distinguer d'une simple information bleue. |
+| `frontend-starter/src/app/components/app/app.css` | La topbar utilise `--blue-900` → `--blue-700`, avec une ombre bleu nuit. |
+| `frontend-starter/src/app/components/tracks-page/tracks-page.css` | Renommage des variables `--green-*` en `--blue-*`. Le message de réussite de l'upload utilise `--success-fg` / `--success-bg`. |

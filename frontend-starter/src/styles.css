@@ -1,39 +1,41 @@
 :root {
-  --green-900: #0f3329;
-  --green-800: #123d32;
-  --green-700: #1d5a49;
-  --green-600: #1d755e;
-  --green-500: #23906f;
-  --green-100: #e3f1ec;
-  --green-50: #f3f7f5;
+  --blue-900: #0b1f3a;
+  --blue-800: #102a4c;
+  --blue-700: #17407a;
+  --blue-600: #1e5bb8;
+  --blue-500: #2b6fd6;
+  --blue-100: #e3ecfa;
+  --blue-50: #f3f6fb;
   --accent: #f5c46b;
   --accent-hover: #f8d38d;
   --radius: 14px;
 
   /* Semantic tokens: components use these, so the dark theme only has to redefine them. */
-  --bg: var(--green-50);
-  --bg-glow: #d8ece4;
+  --bg: var(--blue-50);
+  --bg-glow: #dbe6f7;
   --surface: white;
-  --surface-2: #fbfdfc;
-  --surface-hover: var(--green-50);
-  --card-border: #e6efeb;
-  --line: #e1ebe7;
-  --border: #d3e0db;
-  --border-hover: #b8cbc5;
-  --text: #17312a;
-  --muted: #61756f;
-  --primary: var(--green-600);
-  --primary-hover: var(--green-500);
-  --primary-fg: var(--green-600);
-  --primary-soft: var(--green-100);
-  --primary-soft-fg: var(--green-700);
-  --hero-end: #276c57;
+  --surface-2: #fbfcfe;
+  --surface-hover: var(--blue-50);
+  --card-border: #e4ebf5;
+  --line: #e0e8f3;
+  --border: #d0dbea;
+  --border-hover: #b3c4dc;
+  --text: #13233d;
+  --muted: #5d6b82;
+  --primary: var(--blue-600);
+  --primary-hover: var(--blue-500);
+  --primary-fg: var(--blue-600);
+  --primary-soft: var(--blue-100);
+  --primary-soft-fg: var(--blue-700);
+  --hero-end: #1e4f9a;
   --danger: #b42a2a;
   --danger-hover: #9a2222;
   --danger-fg: #b42a2a;
   --danger-bg: #fdecec;
-  --shadow: 0 1px 2px #17312a0f, 0 10px 30px #17312a14;
-  --shadow-hover: 0 6px 18px #17312a14;
+  --shadow: 0 1px 2px #13233d0f, 0 10px 30px #13233d14;
+  --shadow-hover: 0 6px 18px #13233d14;
+  --success-fg: #1d6b4f;
+  --success-bg: #e2f3ec;
 
   color-scheme: light;
   font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -43,29 +45,31 @@
 
 /* Set by ThemeService (and by the inline script of index.html before Angular starts). */
 :root[data-theme='dark'] {
-  --bg: #0c1512;
-  --bg-glow: #15302a;
-  --surface: #131f1b;
-  --surface-2: #182622;
-  --surface-hover: #1c2e29;
-  --card-border: #20332d;
-  --line: #22362f;
-  --border: #2c443c;
-  --border-hover: #3f5e53;
-  --text: #e2ede9;
-  --muted: #94a9a2;
-  --primary: #1f8466;
-  --primary-hover: #259a77;
-  --primary-fg: #5fcaa4;
-  --primary-soft: #1a3a30;
-  --primary-soft-fg: #86d9bb;
-  --hero-end: #1d5a49;
+  --bg: #0b111c;
+  --bg-glow: #142540;
+  --surface: #121a28;
+  --surface-2: #172133;
+  --surface-hover: #1b2740;
+  --card-border: #1f2b40;
+  --line: #223049;
+  --border: #2c3b56;
+  --border-hover: #3e5276;
+  --text: #e3e9f3;
+  --muted: #94a2b8;
+  --primary: #2563c9;
+  --primary-hover: #3473db;
+  --primary-fg: #7fb0ff;
+  --primary-soft: #1a2c4d;
+  --primary-soft-fg: #a5c6ff;
+  --hero-end: #17407a;
   --danger: #c23b3b;
   --danger-hover: #d24a4a;
   --danger-fg: #ff9090;
   --danger-bg: #3a1c1c;
   --shadow: 0 1px 2px #0000004d, 0 10px 30px #00000066;
   --shadow-hover: 0 6px 18px #00000059;
+  --success-fg: #7fd6b6;
+  --success-bg: #173329;
 
   /* Switches native controls (scrollbars, audio player) and Material's light-dark() colors. */
   color-scheme: dark;
@@ -95,7 +99,7 @@ main { max-width: 1050px; margin: 2rem auto; padding: 0 1rem; }
   margin-bottom: 1.25rem;
   padding: 2rem;
   color: white;
-  background: linear-gradient(120deg, var(--green-800), var(--hero-end));
+  background: linear-gradient(120deg, var(--blue-800), var(--hero-end));
   border-radius: 20px;
   box-shadow: var(--shadow);
 }
@@ -137,7 +141,7 @@ input {
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 input:hover { border-color: var(--border-hover); }
-input:focus { outline: none; border-color: var(--primary-fg); box-shadow: 0 0 0 3px #1d755e2e; }
+input:focus { outline: none; border-color: var(--primary-fg); box-shadow: 0 0 0 3px #1e5bb833; }
 input[type='file'] { padding: 0.6rem; background: var(--bg); border-style: dashed; cursor: pointer; }
 input[aria-invalid='true'] { border-color: var(--danger-fg); }
 input[aria-invalid='true']:focus { box-shadow: 0 0 0 3px #b42a2a26; }
@@ -158,7 +162,7 @@ button {
   cursor: pointer;
   transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
 }
-button:hover:not(:disabled) { background: var(--primary-hover); box-shadow: 0 4px 12px #1d755e40; }
+button:hover:not(:disabled) { background: var(--primary-hover); box-shadow: 0 4px 12px #1e5bb840; }
 button:active:not(:disabled) { transform: translateY(1px); }
 button:focus-visible { outline: 2px solid var(--primary-fg); outline-offset: 2px; }
 button:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -175,7 +179,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* ---------- Material SnackBar variants (panelClass) ---------- */
 .mat-mdc-snack-bar-container.snack-success {
-  --mat-snack-bar-container-color: var(--green-800);
+  --mat-snack-bar-container-color: var(--blue-800);
   --mat-snack-bar-supporting-text-color: white;
   --mat-snack-bar-button-color: var(--accent);
 }
