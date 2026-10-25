@@ -9,8 +9,10 @@ import {
   ConfirmDialogComponent,
   ConfirmDialogData,
 } from '../../shared/components/confirm-dialog/confirm-dialog';
+import { TrackPlayerComponent } from '../../shared/components/track-player/track-player';
 import { Track } from '../../shared/models/track.model';
 import { AudioFormatPipe, FileSizePipe, ShortDatePipe } from '../../shared/pipes/track-format.pipes';
+import { AudioContextService } from '../../shared/services/audio-context.service';
 import { TrackRemovalError, TrackService } from '../../shared/services/track.service';
 import { httpErrorMessage } from '../../shared/utils/http-error';
 
@@ -28,6 +30,7 @@ export type UploadState =
   imports: [
     ReactiveFormsModule,
     IconComponent,
+    TrackPlayerComponent,
     MatPaginatorModule,
     AudioFormatPipe,
     FileSizePipe,
@@ -53,6 +56,7 @@ export type UploadState =
 export class TracksPageComponent implements OnDestroy {
   private readonly service = inject(TrackService);
   private readonly dialog = inject(MatDialog);
+  private readonly audioContext = inject(AudioContextService);
   private readonly snackBar = inject(MatSnackBar);
 
   readonly limit = signal(5);
@@ -65,8 +69,8 @@ export class TracksPageComponent implements OnDestroy {
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly audioUrl = signal('');
-  /** Id of the track loaded in the <audio> player. */
-  private readonly playingTrackId = signal<string | null>(null);
+  /** Id of the track loaded in the <audio> player, shown inside that track's card. */
+  readonly playingTrackId = signal<string | null>(null);
   readonly title = new FormControl('', { nonNullable: true });
   readonly file = signal<File | null>(null);
   readonly cover = signal<File | null>(null);
@@ -100,6 +104,9 @@ export class TracksPageComponent implements OnDestroy {
     this.service.list(this.page(), this.limit()).subscribe({
       next: (response) => {
         console.debug('[TracksPage] Pistes chargées', response.items.length);
+        // The player lives inside its card: if that card is no longer listed, stop playback.
+        const playingId = this.playingTrackId();
+        if (playingId && !response.items.some((track) => track.id === playingId)) this.stopPlaybackOf(playingId);
         this.tracks.set(response.items);
         this.loadCovers(response.items, coverLoadVersion);
         this.page.set(response.page);
@@ -192,6 +199,10 @@ export class TracksPageComponent implements OnDestroy {
   }
 
   play(track: Track): void {
+    // Already loaded in its card: play / pause is handled by the player itself.
+    if (this.playingTrackId() === track.id) return;
+    // Unlocked now, during the click: after the download, the browser would keep the audio graph silent.
+    this.audioContext.unlock();
     this.service.audio(track.id).subscribe({
       next: (blob) => {
         console.debug('[TracksPage] Audio chargé', track.id);
@@ -246,7 +257,7 @@ export class TracksPageComponent implements OnDestroy {
 
   /**
    * The player reads a Blob already downloaded in memory, so deleting the file on the
-   * server does not stop it. Removing the <audio> element (via @if) pauses playback,
+   * server does not stop it. Removing the player from its card (via @if) pauses playback,
    * and revoking the ObjectURL frees the Blob.
    */
   private stopPlaybackOf(trackId: string): void {

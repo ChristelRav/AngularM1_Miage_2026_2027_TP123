@@ -83,6 +83,7 @@
             <li>
               <article
                 class="track-card"
+                [class.playing]="playingTrackId() === track.id"
                 [class.deleting]="deletingIds().has(track.id)"
                 [attr.aria-busy]="deletingIds().has(track.id)"
                 [attr.aria-labelledby]="'track-title-' + track.id"
@@ -136,6 +137,9 @@
                     }
                   </button>
                 </div>
+                @if (playingTrackId() === track.id && audioUrl()) {
+                  <app-track-player class="track-player" [src]="audioUrl()" [label]="track.title" />
+                }
               </article>
             </li>
           } @empty {
@@ -152,9 +156,6 @@
         (page)="pageChanged($event)"
         aria-label="Pagination de la bibliothèque"
       />
-      @if (audioUrl()) {
-        <audio [src]="audioUrl()" controls autoplay></audio>
-      }
     </article>
   </div>
 </section>

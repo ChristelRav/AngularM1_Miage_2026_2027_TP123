@@ -36,6 +36,9 @@
   --shadow-hover: 0 6px 18px #13233d14;
   --success-fg: #1d6b4f;
   --success-bg: #e2f3ec;
+  --wave-played: var(--primary);
+  --wave-played-tip: #d99a2b;
+  --wave-rest: var(--border);
 
   color-scheme: light;
   font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -70,6 +73,9 @@
   --shadow-hover: 0 6px 18px #00000059;
   --success-fg: #7fd6b6;
   --success-bg: #173329;
+  --wave-played: var(--primary-fg);
+  --wave-played-tip: var(--accent);
+  --wave-rest: var(--border-hover);
 
   /* Switches native controls (scrollbars, audio player) and Material's light-dark() colors. */
   color-scheme: dark;

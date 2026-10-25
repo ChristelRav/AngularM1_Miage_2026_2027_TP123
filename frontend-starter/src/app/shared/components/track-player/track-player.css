@@ -1,0 +1,44 @@
+:host {
+  display: grid;
+  gap: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+}
+
+/* Routed through the Web Audio graph and driven by the custom controls below. */
+audio { display: none; }
+
+.waveform-wrapper { position: relative; }
+
+.waveform {
+  display: block;
+  width: 100%;
+  height: 3.5rem;
+  cursor: pointer;
+  border-radius: 6px;
+  touch-action: none;
+}
+.waveform:focus-visible { outline: 2px solid var(--primary-fg); outline-offset: 2px; }
+
+/* Inverted colors (text on surface) so the bubble stands out in both themes. */
+.hover-time {
+  position: absolute;
+  top: -0.3rem;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--surface);
+  white-space: nowrap;
+  pointer-events: none;
+  background: var(--text);
+  border-radius: 4px;
+  transform: translate(-50%, -100%);
+}
+
+.controls { display: flex; align-items: center; gap: 0.75rem; }
+.controls .btn-icon { width: 2.25rem; height: 2.25rem; }
+
+.time { font-size: 0.82rem; font-variant-numeric: tabular-nums; color: var(--muted); }
+
+.spectrum { width: 5rem; height: 1.6rem; margin-left: auto; }

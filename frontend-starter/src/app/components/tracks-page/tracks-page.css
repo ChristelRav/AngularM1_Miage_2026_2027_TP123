@@ -114,6 +114,16 @@
   border-radius: 12px;
 }
 
+/* ---------- Playing card & inline player ---------- */
+.track-card.playing {
+  background: var(--surface);
+  border-color: var(--primary-fg);
+  box-shadow: 0 0 0 1px var(--primary-fg), var(--shadow-hover);
+}
+
+/* Spans the three columns (cover, body, actions) under the card content. */
+.track-player { grid-column: 1 / -1; }
+
 /* ---------- Card actions (play / delete) ---------- */
 .track-actions { display: flex; flex-direction: column; gap: 0.4rem; }
 .track-card.deleting { opacity: 0.55; }

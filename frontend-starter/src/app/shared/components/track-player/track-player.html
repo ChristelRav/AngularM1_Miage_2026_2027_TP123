@@ -1,0 +1,44 @@
+<audio
+  #audio
+  [src]="src()"
+  autoplay
+  (play)="onPlay()"
+  (pause)="onPause()"
+  (ended)="onPause()"
+  (loadedmetadata)="onLoadedMetadata()"
+  (timeupdate)="onTimeUpdate()"
+></audio>
+
+<div class="waveform-wrapper">
+  <canvas
+    #waveform
+    class="waveform"
+    role="slider"
+    tabindex="0"
+    [attr.aria-label]="'Position dans ' + label()"
+    aria-valuemin="0"
+    [attr.aria-valuemax]="duration()"
+    [attr.aria-valuenow]="currentTime()"
+    [attr.aria-valuetext]="elapsedLabel() + ' sur ' + durationLabel()"
+    (pointerdown)="seekFromPointer($event)"
+    (pointermove)="onPointerMove($event)"
+    (pointerleave)="onPointerLeave()"
+    (keydown)="seekFromKeyboard($event)"
+  ></canvas>
+  @if (hoverTip(); as tip) {
+    <span class="hover-time" aria-hidden="true" [style.left.%]="tip.left">{{ tip.label }}</span>
+  }
+</div>
+
+<div class="controls">
+  <button
+    type="button"
+    class="btn-icon"
+    (click)="toggle()"
+    [attr.aria-label]="(playing() ? 'Mettre en pause ' : 'Lire ') + label()"
+  >
+    <app-icon [name]="playing() ? 'pause' : 'play'" />
+  </button>
+  <span class="time">{{ elapsedLabel() }} / {{ durationLabel() }}</span>
+  <canvas #spectrum class="spectrum" aria-hidden="true"></canvas>
+</div>

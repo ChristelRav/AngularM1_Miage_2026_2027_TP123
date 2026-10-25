@@ -10,6 +10,7 @@ export type IconName =
   | 'upload'
   | 'refresh'
   | 'play'
+  | 'pause'
   | 'chevron-left'
   | 'chevron-right'
   | 'save'
@@ -72,6 +73,10 @@ export type IconName =
         }
         @case ('play') {
           <path d="M7 4v16l13-8Z" fill="currentColor" />
+        }
+        @case ('pause') {
+          <rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor" />
+          <rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor" />
         }
         @case ('chevron-left') {
           <path d="m15 18-6-6 6-6" />
