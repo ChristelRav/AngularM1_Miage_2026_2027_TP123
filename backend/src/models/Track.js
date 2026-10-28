@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { Acces } from "./Acces.js";
 
 /*
  * Ce schéma conserve les métadonnées d'une piste. Le fichier audio lui-même
@@ -13,6 +14,10 @@ const schema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    accesId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Acces",
+    },
     title: { type: String, required: true, trim: true },
     originalName: { type: String, required: true },
     storedName: { type: String, required: true, select: false },
@@ -24,6 +29,16 @@ const schema = new mongoose.Schema(
   { timestamps: true },
 );
 
+schema.pre("validate", async function () {
+  if (this.isNew && this.accesId == null) {
+    const privateAccess = await Acces.findOne({ accesName: "privé" }).select("_id");
+    if (!privateAccess) {
+      throw new Error("L'accès privé par défaut n'est pas configuré");
+    }
+    this.accesId = privateAccess._id;
+  }
+});
+
 // Cet index accélère la liste des pistes d'un utilisateur triées par date.
 schema.index({ ownerId: 1, createdAt: -1 });
 
@@ -33,6 +48,7 @@ schema.index({ ownerId: 1, createdAt: -1 });
  */
 schema.methods.toPublic = function () {
   console.debug(`[track-model] Préparation de la piste publique ${this.id}`);
+  const acces = this.populated("accesId") ? this.accesId : null;
   return {
     id: this.id,
     ownerId: String(this.ownerId),
@@ -42,6 +58,12 @@ schema.methods.toPublic = function () {
     size: this.size,
     createdAt: this.createdAt,
     coverUrl: this.coverStoredName ? `/api/tracks/${this.id}/cover` : null,
+    accesId: acces
+      ? {
+          _id: String(acces._id),
+          accesName: acces.accesName,
+        }
+      : null,
   };
 };
 
