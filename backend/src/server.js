@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { createApp } from "./app.js";
+import { ensureDefaultAcces } from "./models/Acces.js";
 import { User } from "./models/User.js";
 
 // Le port et l'URI viennent de l'environnement du backend, jamais d'Angular.
@@ -45,6 +46,13 @@ try {
   }
 } catch (error) {
   console.error("[startup] Impossible de préparer le compte de démonstration", error);
+  throw error;
+}
+
+try {
+  await ensureDefaultAcces();
+} catch (error) {
+  console.error("[startup] Impossible de préparer les accès par défaut", error);
   throw error;
 }
 

@@ -6,6 +6,8 @@ import fs from "node:fs";
 import fsPromises from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
+import mongoose from "mongoose";
+import { Acces } from "./models/Acces.js";
 import { User } from "./models/User.js";
 import { Track } from "./models/Track.js";
 
@@ -283,6 +285,33 @@ export function createApp() {
   });
 
   /** Retourne une page des pistes appartenant exclusivement à l'utilisateur. */
+  app.get("/api/acces", auth, async (_req, res, next) => {
+    try {
+      const acces = await Acces.find().sort({ accesName: 1 });
+      res.json(acces.map((item) => item.toPublic()));
+    } catch (error) {
+      console.error("[acces] Erreur de lecture des accès", error);
+      next(error);
+    }
+  });
+
+  app.post("/api/acces", auth, async (req, res, next) => {
+    try {
+      const accesName =
+        typeof req.body?.accesName === "string" ? req.body.accesName.trim() : "";
+      if (!accesName) {
+        return res.status(400).json({ message: "Le nom de l'accès est requis" });
+      }
+
+      const acces = await Acces.create({ accesName });
+
+      res.status(201).json(acces.toPublic());
+    } catch (error) {
+      console.error("[acces] Erreur de création d'un accès", error);
+      next(error);
+    }
+  });
+
   app.get("/api/tracks", auth, async (req, res, next) => {
     try {
       const page = Math.max(1, Number(req.query.page) || 1);
@@ -299,6 +328,7 @@ export function createApp() {
         // sont stockés dans les variables items et total.
       const [items, total] = await Promise.all([
         Track.find(filter)
+          .populate("accesId", "accesName")
           .sort({ createdAt: -1 })
           .skip((page - 1) * limit)
           .limit(limit)
@@ -316,6 +346,12 @@ export function createApp() {
         ...track,
         id: String(track._id),
         coverUrl: track.coverMimeType ? `/api/tracks/${String(track._id)}/cover` : null,
+        accesId: track.accesId
+          ? {
+              _id: String(track.accesId._id),
+              accesName: track.accesId.accesName,
+            }
+          : null,
         _id: undefined,
       }));
 
@@ -362,8 +398,26 @@ export function createApp() {
           return res.status(400).json({ message: "Fichier audio requis" });
         }
 
+        let accesId;
+        if (req.body.accesId !== undefined) {
+          if (
+            typeof req.body.accesId !== "string" ||
+            !mongoose.isValidObjectId(req.body.accesId)
+          ) {
+            await removeUploadedFiles(req.files, "tracks");
+            return res.status(400).json({ message: "Identifiant d'accès invalide" });
+          }
+
+          accesId = req.body.accesId;
+          if (!(await Acces.exists({ _id: accesId }))) {
+            await removeUploadedFiles(req.files, "tracks");
+            return res.status(400).json({ message: "Accès inconnu" });
+          }
+        }
+
         const track = await Track.create({
           ownerId: req.auth.sub,
+          ...(accesId && { accesId }),
           title: req.body.title || audioFile.originalname,
           originalName: audioFile.originalname,
           storedName: audioFile.filename,
@@ -375,6 +429,7 @@ export function createApp() {
           }),
         });
 
+        await track.populate("accesId", "accesName");
         console.log(`[tracks] Upload enregistré : ${track.id}`);
         res.status(201).json(track.toPublic());
       } catch (error) {
@@ -498,6 +553,9 @@ export function createApp() {
     }
     if (error?.name === "ValidationError") {
       return res.status(400).json({ message: error.message });
+    }
+    if (error?.code === 11000) {
+      return res.status(409).json({ message: "Un accès avec cette valeur existe déjà" });
     }
     if (error?.name === "CastError") {
       return res.status(404).json({ message: "Ressource inconnue" });
