@@ -39,6 +39,18 @@
   --wave-played: var(--primary);
   --wave-played-tip: #d99a2b;
   --wave-rest: var(--border);
+  /*
+   * MilkDrop background palette (gradient map): dark → bright pixels of the visualizer.
+   * Light theme: dark pixels become the page background, bright ones blue then gold.
+   */
+  --viz-0: #f3f6fb;
+  --viz-1: #dbe6f7;
+  --viz-2: #7fb0ff;
+  --viz-3: #2b6fd6;
+  --viz-4: #f5c46b;
+  --viz-5: #d99a2b;
+  --viz-opacity: 0.7;
+  --viz-beat-glow: color-mix(in srgb, var(--accent) 75%, transparent);
 
   color-scheme: light;
   font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -76,6 +88,15 @@
   --wave-played: var(--primary-fg);
   --wave-played-tip: var(--accent);
   --wave-rest: var(--border-hover);
+  --viz-0: #05080f;
+  --viz-1: #102a4c;
+  --viz-2: #1e5bb8;
+  --viz-3: #7fb0ff;
+  --viz-4: #f5c46b;
+  /* Only color added to the palette: a light cream for the brightest flashes. */
+  --viz-5: #fff3d6;
+  --viz-opacity: 0.85;
+  --viz-beat-glow: var(--accent);
 
   /* Switches native controls (scrollbars, audio player) and Material's light-dark() colors. */
   color-scheme: dark;
@@ -182,6 +203,14 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn-danger-ghost { color: var(--danger-fg); background: var(--danger-bg); }
 .btn-danger-ghost:hover:not(:disabled) { color: white; background: var(--danger); box-shadow: 0 4px 12px #b42a2a40; }
 .btn-danger-ghost:focus-visible { outline-color: var(--danger-fg); }
+
+/* ---------- Animated background (MilkDrop visualizer) ---------- */
+/* Set on <html> while the visualizer is visible: the page lets it show through. */
+:root.viz-on body { background: transparent; }
+:root.viz-on .card {
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  backdrop-filter: blur(10px);
+}
 
 /* ---------- Material SnackBar variants (panelClass) ---------- */
 .mat-mdc-snack-bar-container.snack-success {

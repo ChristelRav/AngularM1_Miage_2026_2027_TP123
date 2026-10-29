@@ -17,7 +17,8 @@ export type IconName =
   | 'alert'
   | 'trash'
   | 'sun'
-  | 'moon';
+  | 'moon'
+  | 'sparkles';
 
 /** Inline stroke icon that inherits the surrounding text color and size. */
 @Component({
@@ -96,6 +97,10 @@ export type IconName =
         }
         @case ('moon') {
           <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
+        }
+        @case ('sparkles') {
+          <path d="M11 3l1.9 5.1L18 10l-5.1 1.9L11 17l-1.9-5.1L4 10l5.1-1.9Z" />
+          <path d="M19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8Z" />
         }
         @case ('alert') {
           <circle cx="12" cy="12" r="10" />

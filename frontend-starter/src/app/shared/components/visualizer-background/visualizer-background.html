@@ -1,0 +1,21 @@
+<!--
+  Gradient map: luminance of each pixel (boosted ×1.5, MilkDrop frames are mostly dark), then a
+  lookup table per channel filled from the --viz-* colors.
+-->
+<svg class="filters" focusable="false">
+  <filter id="gpc-visualizer-palette" color-interpolation-filters="sRGB">
+    <feColorMatrix
+      type="matrix"
+      values="0.319 1.073 0.108 0 0
+              0.319 1.073 0.108 0 0
+              0.319 1.073 0.108 0 0
+              0 0 0 1 0"
+    />
+    <feComponentTransfer #transfer>
+      <feFuncR type="table" />
+      <feFuncG type="table" />
+      <feFuncB type="table" />
+    </feComponentTransfer>
+  </filter>
+</svg>
+<canvas #canvas></canvas>

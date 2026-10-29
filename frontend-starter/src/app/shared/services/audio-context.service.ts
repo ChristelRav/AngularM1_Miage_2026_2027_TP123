@@ -1,9 +1,12 @@
-import { Injectable } from '@angular/core';
+import { Injectable, signal } from '@angular/core';
 
 /** One AudioContext for the whole app: browsers limit how many can exist at the same time. */
 @Injectable({ providedIn: 'root' })
 export class AudioContextService {
   private context: AudioContext | null = null;
+
+  /** Node of the track currently playing (null when paused), so the background visualizer can listen to it. */
+  readonly playingSource = signal<AudioNode | null>(null);
 
   get(): AudioContext {
     this.context ??= new AudioContext();

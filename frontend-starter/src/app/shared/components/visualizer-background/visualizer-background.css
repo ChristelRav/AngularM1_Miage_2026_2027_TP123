@@ -1,0 +1,40 @@
+/* Fixed behind the whole page, faded in only while it draws. */
+:host {
+  /* Driven on every frame by the beat detector: 1 on a beat then fading, and the current bass level. */
+  --viz-pulse: 0;
+  --viz-level: 0;
+
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.8s ease;
+}
+:host(.visible) { opacity: var(--viz-opacity); }
+
+.filters { position: absolute; width: 0; height: 0; }
+
+/* Punch on each beat: brighter (bright pixels move up the palette, toward gold and cream) and a small zoom. */
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: url(#gpc-visualizer-palette) brightness(calc(1 + var(--viz-pulse) * 0.45 + var(--viz-level) * 0.25));
+  transform: scale(calc(1.02 + var(--viz-pulse) * 0.035));
+}
+
+/* Gold glow on the screen edges, the part of the background that cards never cover. */
+:host::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+  background: radial-gradient(ellipse at center, transparent 45%, var(--viz-beat-glow) 100%);
+  opacity: calc(var(--viz-pulse) * 0.8);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  canvas { transform: none; }
+  :host::after { display: none; }
+}

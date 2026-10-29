@@ -565,3 +565,62 @@ db.tracks.updateMany(
     }
   }
 )
+
+# Ajout de milk drop 
+## Prompt 
+Ajoute dans le MilKDrop audio visualiser mais en repsectant a la fois les code couleurs
+## paquet installé
+## Paquets installés
+
+Commande : `npm install butterchurn@2.6.7 butterchurn-presets@2.4.7`
+
+| Paquet | Version | Licence | Ajouté | Rôle |
+|---|---|---|---|---|
+| `butterchurn` | 2.6.7 | MIT | directement (`dependencies`) | Moteur MilkDrop en WebGL : lit l'audio et dessine les presets. |
+| `butterchurn-presets` | 2.4.7 | MIT | directement (`dependencies`) | Bibliothèque de 1754 presets (un fichier JSON par preset). Seuls 7 sont importés. |
+| `@babel/runtime` | 7.29.10 | MIT | par `butterchurn` | Fonctions d'aide de Babel utilisées par le code compilé de Butterchurn. |
+| `ecma-proposal-math-extensions` | 0.0.2 | MIT | par les deux paquets | Fonctions mathématiques utilisées par les équations des presets. |
+| `babel-runtime` | 6.26.0 | MIT | par `butterchurn-presets` | Ancienne version des aides Babel. |
+| `core-js` | 2.6.12 | MIT | par `babel-runtime` | Polyfills. |
+| `regenerator-runtime` | 0.11.1 | MIT | par `babel-runtime` | Support des générateurs. |
+| `lodash` | 4.18.1 | MIT | par `butterchurn-presets` | Fonctions utilitaires. |
+
+Effet sur le poids de l'application : **aucun au chargement initial**. Au premier lancement du visualiseur, le navigateur télécharge Butterchurn (199 Ko, soit 35 Ko compressés) et les 7 presets (2 à 7 Ko chacun). Importer le pack complet de presets aurait ajouté environ 12 Mo.
+
+## Fichiers modifiés
+
+| Fichier | Modifications faites |
+|---|---|
+| `frontend-starter/package.json` / `package-lock.json` | Ajout de `butterchurn` et `butterchurn-presets` dans `dependencies` (fait par `npm install`), avec les dépendances indirectes listées plus haut dans le lockfile. |
+| `frontend-starter/angular.json` | `"allowedCommonJsDependencies": ["butterchurn"]` : Butterchurn est distribué en ancien format CommonJS / UMD. Le build l'accepte, et la déclaration supprime l'avertissement « not ESM ». |
+| `frontend-starter/tsconfig.json` | `"resolveJsonModule": true`, pour pouvoir importer les presets, qui sont des fichiers `.json`. |
+| `frontend-starter/src/types/butterchurn.d.ts` (nouveau) | Déclaration des types de Butterchurn (`createVisualizer`, `connectAudio`, `disconnectAudio`, `loadPreset`, `setRendererSize`, `render`), car la bibliothèque n'en fournit pas. Sans eux, TypeScript en mode strict refuse l'import. |
+| `src/app/shared/services/visualizer.service.ts` (nouveau) | Service `providedIn: 'root'` sur le modèle de `ThemeService` : signal `enabled` (désactivé par défaut) et `toggle()`. Le choix est enregistré sous la clé `gpc_visualizer` du `localStorage`, dans des `try/catch` pour la navigation privée. |
+| `src/app/shared/services/audio-context.service.ts` | Ajout du signal `playingSource` : le nœud audio du morceau en cours de lecture, ou `null` en pause. C'est ce qui permet au fond, placé dans `AppComponent`, d'écouter le lecteur, placé dans une carte de la page Backing tracks, avec le même `AudioContext`. |
+| `src/app/shared/components/track-player/track-player.ts` | `onPlay()` déclare la `MediaElementAudioSourceNode` du lecteur dans `playingSource`. `onPause()` et la destruction du lecteur la retirent avec `releasePlayingSource()`, seulement si c'est encore la sienne, au cas où un autre lecteur aurait démarré entre-temps. |
+| `src/app/shared/components/visualizer-background/visualizer-background.ts` (nouveau) | Composant `app-visualizer-background`. <br>• **Chargement à la demande** : au premier morceau joué avec le bouton activé, `import('butterchurn')` et les presets sont chargés, puis `createVisualizer()` est appelé avec l'`AudioContext` de l'application. Le module UMD est récupéré via `default` ou `default.default`, selon l'interopérabilité du bundler. <br>• **Écoute** : un `effect()` branche Butterchurn sur `playingSource` (`connectAudio` / `disconnectAudio`) et suit le changement de morceau. <br>• **Boucle de dessin** : `requestAnimationFrame`, active seulement quand le `computed` `running` est vrai (activé, chargé, en lecture, onglet visible grâce à `visibilitychange`). La détection du rythme et le changement de preset sont décrits dans la partie « Amélioration : suivi du rythme ». <br>• **Taille** : rendu à 60 % de la taille de la fenêtre, recalculé au `resize`. <br>• **Palette** : `applyPalette()` lit les variables CSS `--viz-0` à `--viz-5`, convertit chaque couleur en RGB (normalisation par un contexte canvas) et remplit les tables du filtre SVG. Un `afterRenderEffect` sur le thème la recalcule quand on passe du clair au sombre. <br>• **Fond de page** : un `effect()` ajoute la classe `viz-on` sur `<html>` tant que le visualiseur est visible. <br>• **Nettoyage** : à la destruction, arrêt de la boucle, déconnexion de l'audio et retrait des écouteurs d'événements. |
+| `src/app/shared/components/visualizer-background/visualizer-background.html` (nouveau) | Le filtre SVG `#gpc-visualizer-palette`, en deux étapes : <br>1. `feColorMatrix` calcule la luminosité de chaque pixel (coefficients Rec. 709) en l'augmentant de 50 %, car les images MilkDrop sont surtout sombres ; <br>2. `feComponentTransfer` (`feFuncR/G/B` en mode `table`) transforme cette luminosité en couleur de la palette. <br>`color-interpolation-filters="sRGB"` garde les couleurs exactes du thème. Le `<canvas>` WebGL est dessiné par Butterchurn. |
+| `src/app/shared/components/visualizer-background/visualizer-background.css` (nouveau) | Hôte `position: fixed`, en plein écran, `z-index: -1` (derrière toute la page) et `pointer-events: none` (n'empêche aucun clic). Il est invisible par défaut et apparaît en fondu de 0,8 s avec la classe `.visible`, jusqu'à l'opacité `--viz-opacity`. Le canvas utilise `filter: url(#gpc-visualizer-palette)`. Le battement sur les temps forts est décrit dans la partie « Amélioration : suivi du rythme ». |
+| `src/app/shared/components/visualizer-background/visualizer-presets.ts` (nouveau) | Les 7 presets, importés un par un en `import()` dynamique depuis `butterchurn-presets/presets/converted/` : *Flexi – mindblob 2.0*, *Flexi + Rovastar – landing on Fractopia*, *Aderrasi – Potion of Spirits*, *Eo.S. – glowsticks v2 02*, *Eo.S. + Geiss – glowsticks v2 03 (water mix)*, *Cope – The Neverending Explosion of Red Liquid Fire*, *Flexi + Geiss – Tokamak mindblob 2.0*. |
+| `src/app/components/app/app.html` | Bouton marche / arrêt `.nav-link.theme-toggle` avant le bouton de thème, avec l'icône `sparkles`, `aria-pressed`, un `aria-label` (« Fond animé au rythme de la musique ») et une infobulle qui prévient des effets lumineux rapides. Le bouton prend l'état `.active` quand le visualiseur est activé. Ajout de `<app-visualizer-background />` à la fin du template. |
+| `src/app/components/app/app.ts` | Import de `VisualizerBackgroundComponent` et injection de `VisualizerService`. |
+| `src/app/shared/components/icon/icon.ts` | Nouvelle icône `sparkles` (deux étoiles), pour le bouton du fond animé. |
+| `src/styles.css` | Variables de la palette du visualiseur `--viz-0` à `--viz-5` et `--viz-opacity`, dans le thème clair (`0.7`) et le thème sombre (`0.85`). Règles `:root.viz-on` : fond du `body` transparent pour laisser voir le visualiseur, et cartes légèrement transparentes (86 %, `color-mix`) avec un flou d'arrière-plan (`backdrop-filter: blur(10px)`) pour garder le texte lisible. |
+
+# Amélioration : suivi du rythme
+## prompt
+Modifie le visualiser car il ne suit pas le rythme de la musique
+
+## Pourquoi le fond suivait mal le rythme
+
+1. **Les presets** : choisis « fluides, sans stroboscope », ils ondulent en continu mais réagissent peu aux coups de grosse caisse.
+2. **La palette** : beaucoup de presets marquent le temps par un changement de **couleur**. La gradient map ne garde que la luminosité, donc ce changement disparaissait.
+3. **Les cartes** couvrent le centre de la page, là où l'animation MilkDrop est la plus forte.
+4. **Le changement de preset** se faisait sur un minuteur de 25 s, sans lien avec la musique.
+## Fichiers modifiés
+
+| Fichier | Modifications faites |
+|---|---|
+| `src/app/shared/components/visualizer-background/visualizer-background.ts` | **Nouvelle chaîne audio de détection** : `BiquadFilterNode` passe-bas 150 Hz → `AnalyserNode` (1024 échantillons), branchée et débranchée sur la source en lecture en même temps que Butterchurn, dans `connect()`. <br>• **`followRhythm()`** : lit la forme d'onde des basses (`getFloatTimeDomainData`) et calcule le RMS et l'énergie. Elle compare l'énergie à la moyenne glissante d'environ 1 s (`AVERAGE_WEIGHT = 0.02`), puis appelle `onBeat()` si `énergie > 1,6 × moyenne`, `RMS > 0,04` et 350 ms depuis le dernier temps. <br>• **`onBeat()`** : `pulse = 1`, compte les temps, et passe au preset suivant au 32ᵉ. <br>• **`nextPreset()`** : changement avec un fondu de 1,2 s. Il est aussi appelé au bout de 30 s sans changement (morceau sans temps détecté). <br>• **`setRhythmVariables()`** : écrit `--viz-pulse` et `--viz-level` directement dans le style de l'hôte, sans passer par la détection de changements d'Angular. <br>• La détection tourne sur **son propre minuteur à 50 Hz** (`setInterval` de 20 ms), séparé de la boucle de dessin. <br>• La décroissance du pulse dépend du **temps réellement écoulé**, et elle est appliquée **avant** la détection, pour qu'un temps s'affiche à pleine intensité. <br>• Suppression de l'ancien minuteur de 25 s. |
+| `src/app/shared/components/visualizer-background/visualizer-background.css` | Variables `--viz-pulse` et `--viz-level` (0 par défaut). Sur le canvas, `brightness()` (1 + 0,45 × pulse + 0,25 × niveau) ajouté après le filtre de palette, et `transform: scale()` de 1,02 à 1,055 ; la marge de 2 % évite de voir les bords pendant le zoom. Pseudo-élément `:host::after` : dégradé radial transparent au centre, `--viz-beat-glow` sur les bords, avec une opacité de 0,8 × pulse. `overflow: hidden` sur l'hôte pour que le zoom ne déborde pas. Bloc `@media (prefers-reduced-motion: reduce)` qui retire le zoom et le halo. |
+| `src/styles.css` | Nouvelle variable `--viz-beat-glow`, la couleur du halo : `--accent` en thème sombre, et `--accent` à 75 % (`color-mix`) en thème clair, plus doux sur fond clair. |

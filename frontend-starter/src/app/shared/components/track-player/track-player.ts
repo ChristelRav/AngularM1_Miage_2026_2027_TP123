@@ -99,6 +99,7 @@ export class TrackPlayerComponent {
     });
 
     this.destroyRef.onDestroy(() => {
+      this.releasePlayingSource();
       cancelAnimationFrame(this.frame);
       this.decodeVersion++;
       this.source?.disconnect();
@@ -118,12 +119,14 @@ export class TrackPlayerComponent {
 
   onPlay(): void {
     this.playing.set(true);
+    if (this.source) this.audioContext.playingSource.set(this.source);
     cancelAnimationFrame(this.frame);
     this.frame = requestAnimationFrame(this.tick);
   }
 
   onPause(): void {
     this.playing.set(false);
+    this.releasePlayingSource();
     cancelAnimationFrame(this.frame);
   }
 
@@ -167,6 +170,11 @@ export class TrackPlayerComponent {
   private pointerPosition(event: PointerEvent): number {
     const rect = this.waveform().nativeElement.getBoundingClientRect();
     return Math.min(Math.max((event.clientX - rect.left) / rect.width, 0), 1);
+  }
+
+  /** Only clears the shared source if it is still ours (another player may have started meanwhile). */
+  private releasePlayingSource(): void {
+    if (this.source && this.audioContext.playingSource() === this.source) this.audioContext.playingSource.set(null);
   }
 
   private seek(time: number): void {
