@@ -372,6 +372,40 @@ export function createApp() {
     }
   });
 
+  app.patch("/api/tracks/:id/access", auth, async (req, res, next) => {
+    try {
+      if (!mongoose.isValidObjectId(req.params.id)) {
+        return res.status(400).json({ message: "Identifiant de piste invalide" });
+      }
+
+      const accesId = req.body?.accesId;
+      if (typeof accesId !== "string" || !mongoose.isValidObjectId(accesId)) {
+        return res.status(400).json({ message: "Identifiant d'accès invalide" });
+      }
+
+      const acces = await Acces.findById(accesId).select("_id accesName");
+      if (!acces) {
+        return res.status(400).json({ message: "Accès inconnu" });
+      }
+
+      const track = await Track.findOneAndUpdate(
+        { _id: req.params.id, ownerId: req.auth.sub },
+        { $set: { accesId: acces._id } },
+        { new: true, runValidators: true },
+      ).populate("accesId", "accesName");
+
+      if (!track) {
+        return res.status(404).json({ message: "Piste inconnue" });
+      }
+
+      console.log(`[tracks] Accès de la piste ${track.id} mis à jour`);
+      res.json(track.toPublic());
+    } catch (error) {
+      console.error("[tracks] Erreur de mise à jour de l'accès", error);
+      next(error);
+    }
+  });
+
   /**
    * Reçoit les champs multipart audio, cover (facultatif) et le champ texte title.
    * Multer place les fichiers dans req.files et les champs texte dans req.body.

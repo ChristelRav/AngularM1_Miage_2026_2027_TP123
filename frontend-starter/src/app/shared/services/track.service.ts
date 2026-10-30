@@ -2,7 +2,7 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { catchError, throwError } from 'rxjs';
 import { Page } from '../models/page.model';
-import { Track } from '../models/track.model';
+import { Acces, Track } from '../models/track.model';
 import { httpErrorMessage } from '../utils/http-error';
 
 /** Encapsulates all HTTP operations for backing tracks. */
@@ -14,6 +14,14 @@ export class TrackService {
     return this.http.get<Page<Track>>('/api/tracks', {
       params: { page, limit },
     });
+  }
+
+  accesses() {
+    return this.http.get<Acces[]>('/api/acces');
+  }
+
+  updateAccess(trackId: string, accesId: string) {
+    return this.http.patch<Track>(`/api/tracks/${trackId}/access`, { accesId });
   }
 
   /**

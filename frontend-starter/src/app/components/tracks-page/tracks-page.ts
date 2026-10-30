@@ -10,7 +10,7 @@ import {
   ConfirmDialogData,
 } from '../../shared/components/confirm-dialog/confirm-dialog';
 import { TrackPlayerComponent } from '../../shared/components/track-player/track-player';
-import { Track } from '../../shared/models/track.model';
+import { Acces, Track } from '../../shared/models/track.model';
 import { AudioFormatPipe, FileSizePipe, ShortDatePipe } from '../../shared/pipes/track-format.pipes';
 import { AudioContextService } from '../../shared/services/audio-context.service';
 import { TrackRemovalError, TrackService } from '../../shared/services/track.service';
@@ -62,6 +62,10 @@ export class TracksPageComponent implements OnDestroy {
   readonly limit = signal(5);
   readonly pageSizeOptions = [5, 10, 25, 50];
   readonly tracks = signal<Track[]>([]);
+  readonly accesses = signal<Acces[]>([]);
+  readonly accessMenuTrackId = signal<string | null>(null);
+  readonly loadingAccessesForTrackId = signal<string | null>(null);
+  readonly updatingAccessTrackId = signal<string | null>(null);
   readonly coverUrls = signal<Readonly<Record<string, string>>>({});
   readonly page = signal(1);
   readonly pages = signal(1);
@@ -136,6 +140,59 @@ export class TracksPageComponent implements OnDestroy {
 
   pageChanged(event: PageEvent): void {
     this.go(event.pageIndex + 1, event.pageSize);
+  }
+
+  toggleAccessMenu(track: Track): void {
+    if (this.accessMenuTrackId() === track.id) {
+      this.accessMenuTrackId.set(null);
+      return;
+    }
+
+    this.accessMenuTrackId.set(track.id);
+    this.loadingAccessesForTrackId.set(track.id);
+    this.service.accesses().subscribe({
+      next: (accesses) => {
+        if (this.accessMenuTrackId() === track.id) this.accesses.set(accesses);
+        if (this.loadingAccessesForTrackId() === track.id) {
+          this.loadingAccessesForTrackId.set(null);
+        }
+      },
+      error: (error) => {
+        if (this.accessMenuTrackId() === track.id) this.accessMenuTrackId.set(null);
+        if (this.loadingAccessesForTrackId() === track.id) {
+          this.loadingAccessesForTrackId.set(null);
+        }
+        this.notify(httpErrorMessage(error), true);
+      },
+    });
+  }
+
+  closeAccessMenu(): void {
+    this.accessMenuTrackId.set(null);
+  }
+
+  selectAccess(track: Track, acces: Acces): void {
+    if (track.accesId?._id === acces._id) {
+      this.closeAccessMenu();
+      return;
+    }
+    if (this.updatingAccessTrackId()) return;
+
+    this.closeAccessMenu();
+    this.updatingAccessTrackId.set(track.id);
+    this.service.updateAccess(track.id, acces._id).subscribe({
+      next: (updatedTrack) => {
+        this.tracks.update((tracks) =>
+          tracks.map((current) => (current.id === track.id ? updatedTrack : current)),
+        );
+        this.updatingAccessTrackId.set(null);
+        this.notify(`Accès du morceau défini sur « ${acces.accesName} ».`);
+      },
+      error: (error) => {
+        this.updatingAccessTrackId.set(null);
+        this.notify(httpErrorMessage(error), true);
+      },
+    });
   }
 
   upload(): void {

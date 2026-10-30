@@ -114,6 +114,48 @@
                   </dl>
                 </div>
                 <div class="track-actions">
+                  <div class="access-menu-container">
+                    <button
+                      type="button"
+                      class="btn-icon access-menu-toggle"
+                      (click)="toggleAccessMenu(track)"
+                      (keydown.escape)="closeAccessMenu()"
+                      [disabled]="deletingIds().has(track.id) || updatingAccessTrackId() === track.id"
+                      [attr.aria-expanded]="accessMenuTrackId() === track.id"
+                      [attr.aria-label]="'Modifier l’accès de ' + track.title"
+                    >•••</button>
+                    @if (accessMenuTrackId() === track.id) {
+                      <div
+                        class="access-menu"
+                        role="menu"
+                        [attr.aria-label]="'Accès de ' + track.title"
+                        (keydown.escape)="closeAccessMenu()"
+                      >
+                        @if (loadingAccessesForTrackId() === track.id) {
+                          <p class="access-menu-status">Chargement des accès…</p>
+                        } @else {
+                          @for (access of accesses(); track access._id) {
+                            <button
+                              type="button"
+                              class="access-option"
+                              role="menuitemradio"
+                              [class.selected]="track.accesId?._id === access._id"
+                              [attr.aria-checked]="track.accesId?._id === access._id"
+                              [disabled]="updatingAccessTrackId() === track.id"
+                              (click)="selectAccess(track, access)"
+                            >
+                              <span class="access-option-name">{{ access.accesName }}</span>
+                              @if (track.accesId?._id === access._id) {
+                                <span class="access-check" aria-label="Accès sélectionné">✓</span>
+                              }
+                            </button>
+                          } @empty {
+                            <p class="access-menu-status">Aucun accès disponible.</p>
+                          }
+                        }
+                      </div>
+                    }
+                  </div>
                   <button
                     type="button"
                     class="btn-icon"

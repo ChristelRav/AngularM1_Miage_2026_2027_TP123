@@ -28,6 +28,13 @@ test("les routes des accès exigent une authentification", async () => {
   const list = await fetch(base + "/api/acces");
   assert.equal(list.status, 401);
 
+  const updateTrackAccess = await fetch(base + "/api/tracks/507f1f77bcf86cd799439011/access", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ accesId: "507f1f77bcf86cd799439012" }),
+  });
+  assert.equal(updateTrackAccess.status, 401);
+
   const create = await fetch(base + "/api/acces", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -220,6 +227,40 @@ test(
       assert.equal(defaultTrack.accesId._id, String(privateAccess._id));
       assert.equal(assignedTrack.accesId._id, customAccessId);
 
+      const updatedAccessResponse = await fetch(
+        `${integrationBase}/api/tracks/${assignedTrack.id}/access`,
+        {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({ accesId: String(privateAccess._id) }),
+        },
+      );
+      assert.equal(updatedAccessResponse.status, 200);
+      const updatedTrack = await updatedAccessResponse.json();
+      assert.equal(updatedTrack.accesId._id, String(privateAccess._id));
+      assert.equal(updatedTrack.title, assignedTrack.title);
+      assert.equal(updatedTrack.originalName, assignedTrack.originalName);
+
+      const invalidAccessResponse = await fetch(
+        `${integrationBase}/api/tracks/${assignedTrack.id}/access`,
+        {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({ accesId: "not-an-object-id" }),
+        },
+      );
+      assert.equal(invalidAccessResponse.status, 400);
+
+      const unknownAccessResponse = await fetch(
+        `${integrationBase}/api/tracks/${assignedTrack.id}/access`,
+        {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({ accesId: new mongoose.Types.ObjectId().toString() }),
+        },
+      );
+      assert.equal(unknownAccessResponse.status, 400);
+
       const legacyTrackId = new mongoose.Types.ObjectId();
       trackIds.push(legacyTrackId);
       await Track.collection.insertOne({
@@ -252,8 +293,8 @@ test(
         (item) => item.id === assignedTrack.id,
       );
       assert.equal(returnedDefaultTrack.accesId.accesName, "privé");
-      assert.equal(returnedAssignedTrack.accesId._id, customAccessId);
-      assert.equal(returnedAssignedTrack.accesId.accesName, customAccess.accesName);
+      assert.equal(returnedAssignedTrack.accesId._id, String(privateAccess._id));
+      assert.equal(returnedAssignedTrack.accesId.accesName, "privé");
     } finally {
       if (integrationServer?.listening) {
         for (const trackId of uploadedTrackIds) {

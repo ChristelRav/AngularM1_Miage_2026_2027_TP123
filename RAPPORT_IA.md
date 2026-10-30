@@ -624,3 +624,37 @@ Modifie le visualiser car il ne suit pas le rythme de la musique
 | `src/app/shared/components/visualizer-background/visualizer-background.ts` | **Nouvelle chaîne audio de détection** : `BiquadFilterNode` passe-bas 150 Hz → `AnalyserNode` (1024 échantillons), branchée et débranchée sur la source en lecture en même temps que Butterchurn, dans `connect()`. <br>• **`followRhythm()`** : lit la forme d'onde des basses (`getFloatTimeDomainData`) et calcule le RMS et l'énergie. Elle compare l'énergie à la moyenne glissante d'environ 1 s (`AVERAGE_WEIGHT = 0.02`), puis appelle `onBeat()` si `énergie > 1,6 × moyenne`, `RMS > 0,04` et 350 ms depuis le dernier temps. <br>• **`onBeat()`** : `pulse = 1`, compte les temps, et passe au preset suivant au 32ᵉ. <br>• **`nextPreset()`** : changement avec un fondu de 1,2 s. Il est aussi appelé au bout de 30 s sans changement (morceau sans temps détecté). <br>• **`setRhythmVariables()`** : écrit `--viz-pulse` et `--viz-level` directement dans le style de l'hôte, sans passer par la détection de changements d'Angular. <br>• La détection tourne sur **son propre minuteur à 50 Hz** (`setInterval` de 20 ms), séparé de la boucle de dessin. <br>• La décroissance du pulse dépend du **temps réellement écoulé**, et elle est appliquée **avant** la détection, pour qu'un temps s'affiche à pleine intensité. <br>• Suppression de l'ancien minuteur de 25 s. |
 | `src/app/shared/components/visualizer-background/visualizer-background.css` | Variables `--viz-pulse` et `--viz-level` (0 par défaut). Sur le canvas, `brightness()` (1 + 0,45 × pulse + 0,25 × niveau) ajouté après le filtre de palette, et `transform: scale()` de 1,02 à 1,055 ; la marge de 2 % évite de voir les bords pendant le zoom. Pseudo-élément `:host::after` : dégradé radial transparent au centre, `--viz-beat-glow` sur les bords, avec une opacité de 0,8 × pulse. `overflow: hidden` sur l'hôte pour que le zoom ne déborde pas. Bloc `@media (prefers-reduced-motion: reduce)` qui retire le zoom et le halo. |
 | `src/styles.css` | Nouvelle variable `--viz-beat-glow`, la couleur du halo : `--accent` en thème sombre, et `--accent` à 75 % (`color-mix`) en thème clair, plus doux sur fond clair. |
+
+# Modifier l'accès d'un morceau
+
+## Demande reformulée
+
+> Je veux pouvoir changer facilement le niveau d'accès d'un morceau depuis sa carte. Le menu doit reprendre les accès déjà enregistrés et montrer celui qui est actif. Quand je choisis un autre accès, le changement doit être enregistré, rester après actualisation et être confirmé à l'écran. Il faut aussi vérifier que l'accès existe, ne modifier que le champ concerné et ne pas changer le lecteur audio.
+
+## Analyse et choix retenus
+
+Le backend dispose déjà du modèle `Acces`, de la route authentifiée `GET /api/acces` et d'une relation `Track.accesId` peuplée dans la liste des morceaux. La carte et ses actions Play/Supprimer sont dans `tracks-page`. J'ai donc réutilisé ces éléments, sans ajouter de collection ni changer le lecteur. Une route authentifiée `PATCH /api/tracks/:id/access` valide les identifiants, confirme l'existence de l'accès et met à jour uniquement `accesId` sur une piste appartenant à l'utilisateur.
+
+## Modifications
+
+| Fichier | Modification |
+|---|---|
+| `backend/src/app.js` | Ajout de `PATCH /api/tracks/:id/access`, avec validation des ObjectId, vérification de l'accès et mise à jour ciblée de `accesId` pour le propriétaire de la piste. |
+| `backend/test/api.test.js` | Couverture de l'authentification, du changement d'accès, du rejet des identifiants invalides/inconnus et de la conservation des métadonnées. |
+| `frontend-starter/src/app/shared/services/track.service.ts` | Ajout des appels existants de liste des accès et de mise à jour d'accès. |
+| `frontend-starter/src/app/components/tracks-page/tracks-page.ts` | Chargement des accès à l'ouverture, mise à jour de la carte et messages de succès/erreur. |
+| `frontend-starter/src/app/components/tracks-page/tracks-page.html` et `.css` | Menu compact avec bouton à trois points posé sur la carte, sans pastille bleue, nom et coche sur l'accès sélectionné. Les identifiants restent internes et ne sont pas affichés. Le menu se ferme après le choix. |
+| `frontend-starter/src/app/components/tracks-page/tracks-page.spec.ts` | Test de chargement des options, indication de l'accès actuel et envoi de la modification. |
+| `API_CONTRACT.md` | Documentation de la route, de son corps, de ses réponses et de ses erreurs. |
+
+## Vérifications
+
+- `backend`: `npm test` — 5 réussis, 0 échec. Le test d'intégration MongoDB est ignoré car `MONGODB_TEST_URI` n'est pas configurée.
+- `frontend-starter`: `npm test -- --build-target gpc:build` — 2 réussis, 0 échec; `npm run build` — réussi. L'option `--build-target` est nécessaire dans cette configuration car la cible de build n'a pas de variante `development`.
+- `git diff --check` — réussi.
+
+## Ajustement de présentation demandé
+
+> Les trois points doivent apparaître directement sur la carte, sans rond bleu. Dans le menu, affiche uniquement les noms des accès et ne montre pas leurs identifiants.
+
+Les ObjectId restent utilisés en interne pour comparer et enregistrer l'accès choisi, mais ne sont plus rendus dans l'interface.

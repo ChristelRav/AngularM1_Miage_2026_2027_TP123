@@ -93,3 +93,70 @@ describe('TracksPageComponent pagination', () => {
     expect(fixture.componentInstance.limit()).toBe(10);
   });
 });
+
+describe('TracksPageComponent access menu', () => {
+  let fixture: ComponentFixture<TracksPageComponent>;
+  let httpTesting: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [TracksPageComponent],
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
+    fixture = TestBed.createComponent(TracksPageComponent);
+    httpTesting = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => httpTesting.verify());
+
+  it('loads access options, marks the current one and saves a selection', () => {
+    const track: Track = {
+      id: 'track-1',
+      title: 'Morceau de test',
+      originalName: 'track.mp3',
+      mimeType: 'audio/mpeg',
+      size: 1024,
+      createdAt: '2026-10-07T08:00:00.000Z',
+      accesId: { _id: 'access-private', accesName: 'privé' },
+    };
+    httpTesting.expectOne('/api/tracks?page=1&limit=5').flush({
+      items: [track],
+      page: 1,
+      limit: 5,
+      total: 1,
+      pages: 1,
+    });
+    fixture.detectChanges();
+
+    const menuButton = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+      '.access-menu-toggle',
+    );
+    expect(menuButton).not.toBeNull();
+    menuButton?.click();
+    httpTesting.expectOne('/api/acces').flush([
+      { _id: 'access-private', accesName: 'privé' },
+      { _id: 'access-friendly', accesName: 'friendly' },
+    ]);
+    fixture.detectChanges();
+
+    const options = (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>(
+      '.access-option',
+    );
+    expect(options).toHaveLength(2);
+    expect(options[0].getAttribute('aria-checked')).toBe('true');
+    expect(options[0].textContent).toContain('privé');
+    expect(options[0].textContent).not.toContain('access-private');
+    expect(options[1].textContent).toContain('friendly');
+    expect(options[1].textContent).not.toContain('access-friendly');
+    expect(menuButton?.classList.contains('btn-icon')).toBe(true);
+    options[1].click();
+
+    const updateRequest = httpTesting.expectOne('/api/tracks/track-1/access');
+    expect(updateRequest.request.method).toBe('PATCH');
+    expect(updateRequest.request.body).toEqual({ accesId: 'access-friendly' });
+    updateRequest.flush({ ...track, accesId: { _id: 'access-friendly', accesName: 'friendly' } });
+
+    expect(fixture.componentInstance.tracks()[0].accesId?.accesName).toBe('friendly');
+    expect(fixture.componentInstance.accessMenuTrackId()).toBeNull();
+  });
+});
