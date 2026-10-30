@@ -26,12 +26,14 @@ Params :
 - tokony oe afaka vahana ngeza be ilay music//audio
 - raha za ko dia asiana sidebar : mes music, ma playlist, accueil (chansons publié)
 
+ilay butterchurn  manaraka ilay rythme ilay musique
 # TO DO - christelle
 - ** partage fichier : back - front 
 - ** ma playlist : bdd - back - front
 - ** look & field : Profil 
 
 # TO DO - Johary
-
-
+-** API Import de donnée massif
+-** Categorie Audio+Filtre
+-**Egaliseur
 # - fonctionnalité 
