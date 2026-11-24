@@ -1,0 +1,103 @@
+<section>
+  <div class="hero">
+    <p class="eyebrow">ACCUEIL</p>
+    <h1>Tableau de bord</h1>
+    <p>Un aperçu de votre bibliothèque de backing tracks.</p>
+  </div>
+
+  @if (error(); as message) {
+    <p class="error" role="alert">
+      <app-icon name="alert" />{{ message }}
+      <button type="button" class="btn-ghost retry" (click)="load()">Réessayer</button>
+    </p>
+  }
+
+  <ul class="stats" aria-label="Statistiques">
+    @for (stat of stats(); track stat.label) {
+      <li>
+        <a class="stat card" [routerLink]="stat.link">
+          <span class="card-icon"><app-icon [name]="stat.icon" /></span>
+          <span class="stat-text">
+            <span class="stat-label">{{ stat.label }}</span>
+            @if (stat.value === null) {
+              <span class="stat-soon">Bientôt disponible</span>
+            } @else if (loading()) {
+              <span class="stat-value" aria-label="Chargement">…</span>
+            } @else {
+              <span class="stat-value">{{ stat.value }}</span>
+            }
+          </span>
+        </a>
+      </li>
+    }
+  </ul>
+
+  <div class="grid dashboard-grid">
+    <article class="card">
+      <div class="row">
+        <div class="card-header">
+          <span class="card-icon"><app-icon name="music" /></span>
+          <h2>Dernières musiques</h2>
+        </div>
+        <a class="see-all" routerLink="/tracks">Tout voir<app-icon name="arrow-right" /></a>
+      </div>
+
+      @if (loading()) {
+        <p class="muted">Chargement…</p>
+      } @else if (!error()) {
+        <ul class="recent-grid" aria-label="Dernières musiques ajoutées">
+          @for (track of recentTracks(); track track.id) {
+            <li class="recent">
+              <span class="thumb recent-cover">
+                @if (coverUrls()[track.id]) {
+                  <img [src]="coverUrls()[track.id]" [alt]="'Couverture de ' + track.title" />
+                } @else {
+                  <span class="thumb-placeholder" aria-hidden="true"><app-icon name="music" /></span>
+                }
+              </span>
+              <b class="recent-title" [title]="track.title">{{ track.title }}</b>
+              <small class="muted">
+                <span class="badge">{{ track.mimeType | audioFormat }}</span>
+                {{ track.createdAt | shortDate }}
+              </small>
+            </li>
+          } @empty {
+            <li class="empty">
+              Aucune musique pour l’instant.
+              <a routerLink="/tracks">Importer ma première backing track</a>
+            </li>
+          }
+        </ul>
+      }
+    </article>
+
+    <article class="card">
+      <div class="card-header">
+        <span class="card-icon"><app-icon name="clock" /></span>
+        <h2>Dernières activités</h2>
+      </div>
+      @if (loading()) {
+        <p class="muted">Chargement…</p>
+      } @else if (!error()) {
+        <ol class="activity" aria-label="Derniers imports">
+          @for (track of recentTracks(); track track.id) {
+            <li>
+              <span class="activity-dot" aria-hidden="true"><app-icon name="upload" /></span>
+              <span class="activity-text">
+                Import de <b>« {{ track.title }} »</b>
+                <small class="muted">
+                  <time [attr.datetime]="track.createdAt">{{ track.createdAt | shortDate }}</time>
+                  @if (track.accesId) {
+                    · accès {{ track.accesId.accesName }}
+                  }
+                </small>
+              </span>
+            </li>
+          } @empty {
+            <li class="muted">Aucune activité récente.</li>
+          }
+        </ol>
+      }
+    </article>
+  </div>
+</section>

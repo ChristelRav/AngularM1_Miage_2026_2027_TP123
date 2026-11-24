@@ -1,0 +1,92 @@
+.muted { color: var(--muted); }
+.retry { margin-left: auto; padding: 0.35rem 0.8rem; }
+
+/* ---------- Statistics ---------- */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin: 0 0 1.25rem;
+  padding: 0;
+  list-style: none;
+}
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  height: 100%;
+  padding: 1.1rem 1.25rem;
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.stat:hover { color: var(--text); border-color: var(--border-hover); box-shadow: var(--shadow-hover); }
+.stat-text { display: grid; gap: 0.1rem; }
+.stat-label { font-size: 0.85rem; color: var(--muted); }
+.stat-value { font-size: 1.6rem; font-weight: 800; line-height: 1.1; }
+.stat-soon { font-size: 0.9rem; font-weight: 600; color: var(--muted); }
+
+/* ---------- Layout ---------- */
+.dashboard-grid { grid-template-columns: 3fr 2fr; }
+.see-all { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.9rem; text-decoration: none; }
+
+/* ---------- Recent tracks: identical thumbnails, with or without cover ---------- */
+.recent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 0.9rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.recent { display: grid; gap: 0.3rem; min-width: 0; }
+.recent-cover { --thumb-radius: 12px; font-size: 2rem; }
+.recent-title { overflow: hidden; font-size: 0.92rem; text-overflow: ellipsis; white-space: nowrap; }
+.recent small { display: flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; }
+
+.badge {
+  padding: 0.05rem 0.4rem;
+  font-size: 0.68rem;
+  color: var(--primary-soft-fg);
+  background: var(--primary-soft);
+  border-radius: 6px;
+}
+
+.empty {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 0.4rem;
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--muted);
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+}
+
+/* ---------- Activity ---------- */
+.activity { display: grid; gap: 0.85rem; margin: 1rem 0 0; padding: 0; list-style: none; }
+.activity li { display: flex; align-items: flex-start; gap: 0.7rem; }
+.activity-dot {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  font-size: 0.9rem;
+  color: var(--success-fg);
+  background: var(--success-bg);
+  border-radius: 50%;
+}
+.activity-text { display: grid; gap: 0.1rem; min-width: 0; font-size: 0.9rem; overflow-wrap: anywhere; }
+.activity-text small { font-size: 0.78rem; }
+
+@media (max-width: 900px) {
+  .dashboard-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 720px) {
+  .stats { grid-template-columns: 1fr; gap: 0.6rem; }
+  .stat { padding: 0.9rem 1rem; }
+}
+@media (max-width: 420px) {
+  .recent-grid { grid-template-columns: repeat(2, 1fr); }
+}

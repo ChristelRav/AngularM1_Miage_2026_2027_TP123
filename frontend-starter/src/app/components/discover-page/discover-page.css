@@ -1,0 +1,32 @@
+/* Two-option switch; each source keeps its own color (public: blue, friends: gold). */
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.25rem;
+  margin-bottom: 1.25rem;
+  padding: 0.25rem;
+  background: var(--primary-soft);
+  border-radius: 12px;
+}
+.segment,
+.segment:hover:not(:disabled) {
+  gap: 0.45rem;
+  padding: 0.6rem 0.5rem;
+  font-size: 0.9rem;
+  color: var(--primary-soft-fg);
+  background: transparent;
+  border-radius: 9px;
+  box-shadow: none;
+}
+.segment:hover:not(.active) { background: color-mix(in srgb, var(--surface) 50%, transparent); }
+.segment.active,
+.segment.active:hover { color: var(--text); background: var(--surface); box-shadow: var(--shadow-hover); }
+.segment.active[data-source='public'] app-icon { color: var(--primary-fg); }
+.segment.active[data-source='friends'] app-icon { color: #d99a2b; }
+
+.rules { max-width: 34rem; margin: 0.2rem 0 0; font-size: 0.85rem; color: var(--muted); }
+.soon-link { display: inline-flex; align-items: center; gap: 0.4rem; margin-top: 0.4rem; }
+
+@media (max-width: 480px) {
+  .segment { font-size: 0.8rem; }
+}
