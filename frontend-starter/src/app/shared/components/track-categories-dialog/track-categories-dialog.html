@@ -1,0 +1,13 @@
+<h2 mat-dialog-title>Catégories de « {{ data.track.title }} »</h2>
+<mat-dialog-content>
+  <app-category-picker [categories]="data.categories" [(selectedIds)]="selectedIds" [disabled]="saving()" />
+  @if (error(); as message) {
+    <p class="error" role="alert">{{ message }}</p>
+  }
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button type="button" class="btn-ghost" mat-dialog-close [disabled]="saving()">Annuler</button>
+  <button type="button" (click)="save()" [disabled]="saving()">
+    {{ saving() ? 'Enregistrement…' : 'Enregistrer' }}
+  </button>
+</mat-dialog-actions>

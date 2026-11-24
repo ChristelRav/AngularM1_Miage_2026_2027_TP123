@@ -29,6 +29,21 @@
       @if (cover(); as selectedCover) {
         <p class="track-file">Couverture sélectionnée : {{ selectedCover.name }}</p>
       }
+      <fieldset class="category-field">
+        <legend>Catégories (facultatives)</legend>
+        @if (categoriesError(); as message) {
+          <p class="error" role="alert">
+            <app-icon name="alert" />{{ message }}
+            <button type="button" class="btn-ghost" (click)="loadCategories()">Réessayer</button>
+          </p>
+        } @else {
+          <app-category-picker
+            [categories]="categories()"
+            [(selectedIds)]="selectedCategoryIds"
+            [disabled]="uploading()"
+          />
+        }
+      </fieldset>
       <button type="button" (click)="upload()" [disabled]="!file() || uploading()">
         @if (uploading()) {
           <span class="spinner" aria-hidden="true"></span>Envoi en cours…
@@ -156,6 +171,16 @@
                       </div>
                     }
                   </div>
+                  <button
+                    type="button"
+                    class="btn-icon btn-ghost"
+                    (click)="editCategories(track)"
+                    [disabled]="deletingIds().has(track.id) || !categories().length"
+                    [attr.aria-label]="'Modifier les catégories de ' + track.title"
+                    title="Catégories"
+                  >
+                    <app-icon name="tag" />
+                  </button>
                   <button
                     type="button"
                     class="btn-icon"

@@ -18,7 +18,8 @@ export type IconName =
   | 'trash'
   | 'sun'
   | 'moon'
-  | 'sparkles';
+  | 'sparkles'
+  | 'tag';
 
 /** Inline stroke icon that inherits the surrounding text color and size. */
 @Component({
@@ -90,6 +91,10 @@ export type IconName =
           <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
           <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
           <path d="M10 11v6M14 11v6" />
+        }
+        @case ('tag') {
+          <path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4z" />
+          <circle cx="7.5" cy="7.5" r="1.5" />
         }
         @case ('sun') {
           <circle cx="12" cy="12" r="4" />

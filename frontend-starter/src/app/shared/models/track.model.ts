@@ -1,3 +1,5 @@
+import { Category } from './category.model';
+
 /** Audio track metadata returned by the API. */
 export interface Acces {
   _id: string;
@@ -13,4 +15,8 @@ export interface Track {
   createdAt: string;
   coverUrl?: string | null;
   accesId?: Acces | null;
+  /** Ids stored in the track document (`tracks.categoryIds`); empty for tracks without categories. */
+  categoryIds?: string[];
+  /** The same categories with their details (name, type, image), sent by the API for display. */
+  categories?: Category[];
 }

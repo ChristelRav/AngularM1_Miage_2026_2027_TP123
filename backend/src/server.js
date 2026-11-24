@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 import { createApp } from "./app.js";
 import { ensureDefaultAcces } from "./models/Acces.js";
 import { User } from "./models/User.js";
+import { LEGACY_COLLECTION } from "./migrations/migrate-track-categories.js";
+import { ensureDefaultCategories } from "./seeds/categories.seed.js";
 
 // Le port et l'URI viennent de l'environnement du backend, jamais d'Angular.
 const port = process.env.PORT || 3000;
@@ -53,6 +55,24 @@ try {
   await ensureDefaultAcces();
 } catch (error) {
   console.error("[startup] Impossible de préparer les accès par défaut", error);
+  throw error;
+}
+
+try {
+  await ensureDefaultCategories();
+
+  // Les catégories sont maintenant dans tracks.categoryIds : on signale
+  // l'ancienne collection de liaison si elle n'a pas encore été migrée.
+  const legacy = await mongoose.connection.db
+    .listCollections({ name: LEGACY_COLLECTION })
+    .toArray();
+  if (legacy.length) {
+    console.warn(
+      `[startup] La collection ${LEGACY_COLLECTION} existe encore : lancez npm run migrate:track-categories`,
+    );
+  }
+} catch (error) {
+  console.error("[startup] Impossible de préparer les catégories par défaut", error);
   throw error;
 }
 

@@ -10,7 +10,14 @@ import {
   ConfirmDialogData,
 } from '../../shared/components/confirm-dialog/confirm-dialog';
 import { TrackPlayerComponent } from '../../shared/components/track-player/track-player';
+import { CategoryPickerComponent } from '../../shared/components/category-picker/category-picker';
+import {
+  TrackCategoriesDialogComponent,
+  TrackCategoriesDialogData,
+} from '../../shared/components/track-categories-dialog/track-categories-dialog';
+import { Category } from '../../shared/models/category.model';
 import { Acces, Track } from '../../shared/models/track.model';
+import { CategoryService } from '../../shared/services/category.service';
 import { AudioFormatPipe, FileSizePipe, ShortDatePipe } from '../../shared/pipes/track-format.pipes';
 import { AudioContextService } from '../../shared/services/audio-context.service';
 import { TrackRemovalError, TrackService } from '../../shared/services/track.service';
@@ -31,6 +38,7 @@ export type UploadState =
     ReactiveFormsModule,
     IconComponent,
     TrackPlayerComponent,
+    CategoryPickerComponent,
     MatPaginatorModule,
     AudioFormatPipe,
     FileSizePipe,
@@ -58,6 +66,13 @@ export class TracksPageComponent implements OnDestroy {
   private readonly dialog = inject(MatDialog);
   private readonly audioContext = inject(AudioContextService);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly categoryService = inject(CategoryService);
+
+  /** All active categories, loaded once from the API. */
+  readonly categories = signal<Category[]>([]);
+  readonly categoriesError = signal<string | null>(null);
+  /** Categories chosen in the upload form (optional). */
+  readonly selectedCategoryIds = signal<string[]>([]);
 
   readonly limit = signal(5);
   readonly pageSizeOptions = [5, 10, 25, 50];
@@ -88,6 +103,41 @@ export class TracksPageComponent implements OnDestroy {
 
   constructor() {
     this.load();
+    this.loadCategories();
+  }
+
+  loadCategories(): void {
+    this.categoriesError.set(null);
+    this.categoryService.list().subscribe({
+      next: (categories) => {
+        console.debug('[TracksPage] Catégories chargées', categories.length);
+        this.categories.set(categories);
+      },
+      error: (error) => {
+        console.error('[TracksPage] Catégories impossibles à charger', error);
+        this.categoriesError.set(httpErrorMessage(error));
+      },
+    });
+  }
+
+  editCategories(track: Track): void {
+    this.dialog
+      .open<TrackCategoriesDialogComponent, TrackCategoriesDialogData, Category[]>(
+        TrackCategoriesDialogComponent,
+        { data: { track, categories: this.categories() }, width: '640px', maxWidth: '95vw' },
+      )
+      .afterClosed()
+      .subscribe((categories) => {
+        if (!categories) return;
+        this.tracks.update((tracks) =>
+          tracks.map((current) =>
+            current.id === track.id
+              ? { ...current, categories, categoryIds: categories.map((category) => category._id) }
+              : current,
+          ),
+        );
+        this.notify(`Catégories de « ${track.title} » mises à jour.`);
+      });
   }
 
   choose(event: Event): void {
@@ -183,7 +233,10 @@ export class TracksPageComponent implements OnDestroy {
     this.service.updateAccess(track.id, acces._id).subscribe({
       next: (updatedTrack) => {
         this.tracks.update((tracks) =>
-          tracks.map((current) => (current.id === track.id ? updatedTrack : current)),
+          // The PATCH response has categoryIds but not the category details: keep the ones shown.
+          tracks.map((current) =>
+            current.id === track.id ? { ...updatedTrack, categories: current.categories } : current,
+          ),
         );
         this.updatingAccessTrackId.set(null);
         this.notify(`Accès du morceau défini sur « ${acces.accesName} ».`);
@@ -202,7 +255,9 @@ export class TracksPageComponent implements OnDestroy {
 
     this.uploadState.set({ status: 'uploading', progress: 0 });
 
-    this.service.upload(file, this.title.value.trim() || file.name, this.cover()).subscribe({
+    this.service
+      .upload(file, this.title.value.trim() || file.name, this.cover(), this.selectedCategoryIds())
+      .subscribe({
       next: (event) => {
         if (event.type === HttpEventType.UploadProgress) {
           const progress = event.total ? Math.round((100 * event.loaded) / event.total) : null;
@@ -228,6 +283,7 @@ export class TracksPageComponent implements OnDestroy {
     this.title.setValue('');
     this.file.set(null);
     this.cover.set(null);
+    this.selectedCategoryIds.set([]);
     // A file input can only be cleared through its DOM value.
     this.fileInput().nativeElement.value = '';
     this.coverInput().nativeElement.value = '';

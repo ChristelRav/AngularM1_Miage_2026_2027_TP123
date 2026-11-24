@@ -25,6 +25,12 @@ const schema = new mongoose.Schema(
     size: { type: Number, required: true, min: 0 },
     coverStoredName: { type: String, select: false },
     coverMimeType: { type: String },
+    // Catégories de la piste (zéro, une ou plusieurs). Les anciennes pistes
+    // sans ce champ sont traitées comme ayant un tableau vide.
+    categoryIds: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Category" }],
+      default: [],
+    },
   },
   { timestamps: true },
 );
@@ -58,6 +64,7 @@ schema.methods.toPublic = function () {
     size: this.size,
     createdAt: this.createdAt,
     coverUrl: this.coverStoredName ? `/api/tracks/${this.id}/cover` : null,
+    categoryIds: (this.categoryIds ?? []).map(String),
     accesId: acces
       ? {
           _id: String(acces._id),

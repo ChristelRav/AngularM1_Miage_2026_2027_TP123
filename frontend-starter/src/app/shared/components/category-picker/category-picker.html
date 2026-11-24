@@ -1,0 +1,75 @@
+<div class="picker" [class.disabled]="disabled()">
+  <div class="summary" aria-live="polite">
+    @if (selectedCategories().length) {
+      <div class="summary-head">
+        <span>{{ selectedCategories().length }} catégorie(s) sélectionnée(s)</span>
+        <button type="button" class="link-button" (click)="clear()" [disabled]="disabled()">Tout retirer</button>
+      </div>
+      <ul class="chips" aria-label="Catégories sélectionnées">
+        @for (category of selectedCategories(); track category._id) {
+          <li class="chip" [attr.data-type]="category.type">
+            {{ category.name }}
+            <button
+              type="button"
+              class="chip-remove"
+              (click)="toggle(category)"
+              [disabled]="disabled()"
+              [attr.aria-label]="'Retirer ' + category.name"
+            >×</button>
+          </li>
+        }
+      </ul>
+    } @else {
+      <p class="hint">Facultatif : choisissez autant de catégories que vous voulez.</p>
+    }
+  </div>
+
+  <div class="tabs" role="tablist" aria-label="Groupes de catégories">
+    @for (group of groups; track group.type) {
+      <button
+        type="button"
+        role="tab"
+        class="tab"
+        [class.active]="activeType() === group.type"
+        [attr.aria-selected]="activeType() === group.type"
+        (click)="activeType.set(group.type)"
+      >
+        {{ group.label }}
+        @if (countByType()[group.type]) {
+          <span class="tab-count">{{ countByType()[group.type] }}</span>
+        }
+      </button>
+    }
+  </div>
+
+  <ul class="tiles" role="tabpanel">
+    @for (category of visibleCategories(); track category._id) {
+      <li>
+        <button
+          type="button"
+          class="tile"
+          [class.selected]="isSelected(category)"
+          [attr.data-type]="category.type"
+          [attr.aria-pressed]="isSelected(category)"
+          [title]="category.description"
+          [disabled]="disabled()"
+          (click)="toggle(category)"
+        >
+          <span class="tile-image">
+            @if (hasImage(category)) {
+              <img [src]="category.image.url" [alt]="category.image.alt" loading="lazy" (error)="imageFailed(category)" />
+            } @else {
+              <span class="tile-placeholder" aria-hidden="true">{{ initials(category) }}</span>
+            }
+            @if (isSelected(category)) {
+              <span class="tile-check" aria-hidden="true">✓</span>
+            }
+          </span>
+          <span class="tile-name">{{ category.name }}</span>
+        </button>
+      </li>
+    } @empty {
+      <li class="hint">Aucune catégorie disponible.</li>
+    }
+  </ul>
+</div>

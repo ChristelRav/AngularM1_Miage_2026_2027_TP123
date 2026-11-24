@@ -2,3 +2,5 @@ node_modules/
 data/uploads/*
 !data/uploads/.gitkeep
 .env
+# Images des catégories (fichiers de l'application, pas des uploads utilisateurs)
+!data/uploads/categories/

@@ -29,11 +29,13 @@ export class TrackService {
    * caller can follow the upload. Errors are emitted as `Error` objects whose message
    * can be shown as is.
    */
-  upload(file: File, title: string, cover?: File | null) {
+  upload(file: File, title: string, cover?: File | null, categoryIds: string[] = []) {
     const body = new FormData();
     body.append('audio', file);
     body.append('title', title);
     if (cover) body.append('cover', cover);
+    // One repeated field per category; none at all when nothing is selected.
+    for (const categoryId of categoryIds) body.append('categoryIds', categoryId);
     return this.http
       .post<Track>('/api/tracks', body, { reportUploadProgress: true, observe: 'events' })
       .pipe(catchError((error: unknown) => throwError(() => new Error(uploadErrorMessage(error)))));

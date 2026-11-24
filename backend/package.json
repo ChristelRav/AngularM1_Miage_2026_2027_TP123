@@ -6,6 +6,7 @@
         "start": "node --env-file=.env src/server.js",
         "start:local": "node src/server.js",
         "migrate:tracks-access": "node --env-file=.env src/scripts/migrate-tracks-access.js",
+        "migrate:track-categories": "node --env-file=.env src/scripts/migrate-track-categories.js",
         "test": "node --test"
     },
     "dependencies": {

@@ -658,3 +658,151 @@ Le backend dispose déjà du modèle `Acces`, de la route authentifiée `GET /ap
 > Les trois points doivent apparaître directement sur la carte, sans rond bleu. Dans le menu, affiche uniquement les noms des accès et ne montre pas leurs identifiants.
 
 Les ObjectId restent utilisés en interne pour comparer et enregistrer l'accès choisi, mais ne sont plus rendus dans l'interface.
+
+# Catégories musicales
+
+## Prompt
+
+> Je veux pouvoir classer mes morceaux par catégories : genre (Pop, Rock…), ambiance (Joyeuse, Triste…) et thème (Noël, Voyage…). À l'import d'un morceau, je dois pouvoir en choisir plusieurs, ou aucune, avec une interface agréable : des petites cartes avec image, rangées en trois groupes, et une sélection bien visible. Les catégories doivent être créées automatiquement au démarrage du backend, sans doublon, et venir de l'API (pas écrites en dur dans Angular). Il faut aussi pouvoir modifier les catégories d'un morceau, et supprimer ses liaisons quand on supprime le morceau. Les images ne sont pas stockées dans MongoDB, seulement leur chemin. Ne pas casser l'import actuel ni les anciens morceaux.
+
+## Analyse et choix retenus
+
+- Toutes les routes sont dans `backend/src/app.js` et les données par défaut sont créées au démarrage comme les accès (`ensureDefaultAcces`). J'ai suivi la même logique plutôt que de créer des dossiers `routes/` ou `controllers/` qui n'existent pas dans le projet.
+- **Relation plusieurs-à-plusieurs** : une collection de liaison `trackcategories` (`trackId`, `categoryId`, `createdAt`) avec un index unique sur le couple. Le modèle `Track` n'est **pas modifié** : un ancien morceau a simplement zéro liaison.
+- **Seed sans doublon** : `updateOne` + `$setOnInsert` + `upsert` sur le `slug` (unique). Une catégorie déjà présente n'est ni dupliquée ni modifiée. `timestamps: false` sur cet appel, sinon Mongoose changerait `updatedAt` à chaque démarrage.
+- **Sous-genres** : `parentId` est utilisé pour Métal → Rock, Rap → Hip-Hop, K-pop/J-pop/C-pop → Pop, House/Techno → Électro.
+- **Images** : chemin `/uploads/categories/<slug>.jpg`. Le backend expose **uniquement** ce sous-dossier en public (une balise `<img>` n'envoie pas le JWT) ; les fichiers audio restent protégés. Si une image manque, le backend affiche un avertissement au démarrage, et Angular affiche une vignette de couleur avec les initiales.
+- **Interface** : trois onglets (Genres musicaux / Ambiances / Thèmes) avec le nombre de catégories choisies dans chacun, une grille de cartes avec image, une coche et une bordure de couleur sur les cartes choisies, et un résumé des catégories choisies avec une croix pour les retirer. Une couleur par groupe (bleu, orange, violet).
+
+## Modifications
+
+| Fichier | Modification |
+|---|---|
+| `backend/src/models/Category.js` (nouveau) | Schéma `Category` : `name`, `slug` (unique, format `mot-mot`), `type` (`GENRE`/`MOOD`/`THEME`), `parentId`, `description`, `image {url, alt}`, `isActive`, timestamps. |
+| `backend/src/models/TrackCategory.js` (nouveau) | Collection de liaison avec index unique `{trackId, categoryId}`. `replaceForTrack()` remplace les catégories d'une piste, `categoriesByTrack()` récupère les catégories de plusieurs pistes en 2 requêtes, `parseCategoryIds()` valide les identifiants reçus. |
+| `backend/src/seeds/categories.seed.js` (nouveau) | Les 52 catégories (21 genres, 13 ambiances, 18 thèmes) avec description et texte alternatif. `ensureDefaultCategories()` les insère sans doublon et signale les images manquantes. |
+| `backend/src/server.js` | Appel du seed au démarrage, après les accès. |
+| `backend/src/app.js` | Routes `GET /api/categories`, `GET` et `PUT /api/tracks/:id/categories`, dossier public `/uploads/categories`. `POST /api/tracks` accepte `categoryIds` (facultatif). `GET /api/tracks` renvoie `categories` pour chaque piste. `DELETE /api/tracks/:id` supprime les liaisons. |
+| `backend/.gitignore` | Le dossier `data/uploads/categories/` peut être versionné (images de l'application), les autres uploads restent ignorés. |
+| `backend/data/uploads/categories/README.md` (nouveau) | Liste des 52 noms de fichiers attendus et de l'image conseillée pour chacun. |
+| `backend/test/categories.test.js` (nouveau) | Tests unitaires (authentification, schémas, données du seed, sécurité du dossier public) et test d'intégration MongoDB. |
+| `frontend-starter/src/app/shared/models/category.model.ts` (nouveau) | Interface `Category` et libellés des trois groupes. |
+| `frontend-starter/src/app/shared/models/track.model.ts` | Champ facultatif `categories`. |
+| `frontend-starter/src/app/shared/services/category.service.ts` (nouveau) | `list(type?)`, `forTrack(id)`, `updateForTrack(id, ids)`. |
+| `frontend-starter/src/app/shared/services/track.service.ts` | `upload()` envoie un champ `categoryIds` par catégorie choisie. |
+| `frontend-starter/src/app/shared/components/category-picker/` (nouveau) | Composant de sélection : onglets, cartes avec image, coche, résumé, image de remplacement. |
+| `frontend-starter/src/app/shared/components/track-categories-dialog/` (nouveau) | Fenêtre de modification des catégories d'un morceau. |
+| `frontend-starter/src/app/components/tracks-page/` (`.ts`, `.html`, `.css`, `.spec.ts`) | Sélecteur dans le formulaire d'import, badges de catégories sur chaque carte, bouton étiquette pour les modifier. Le changement d'accès garde les catégories affichées. Nouveau test. |
+| `frontend-starter/src/app/shared/components/icon/icon.ts` | Icône `tag`. |
+| `frontend-starter/proxy.conf.json` | Redirection de `/uploads/categories` vers le backend, pour afficher les images. |
+| `API_CONTRACT.md` | Documentation des nouvelles routes, du champ `categoryIds` et de `Track.categories`. |
+
+## Base de données
+
+- Nouvelle collection `categories` : 52 documents créés au premier démarrage.
+- Nouvelle collection `trackcategories` : index unique `{trackId: 1, categoryId: 1}`.
+- La collection `tracks` n'est pas modifiée, aucune migration n'est nécessaire.
+
+## Vérifications
+
+| Vérification | Résultat |
+|---|---|
+| 1. Catégories créées au démarrage | Log `[startup] Catégories : 52 créée(s), 0 déjà présente(s)`. |
+| 2. Pas de doublon au 2ᵉ démarrage | Log `0 créée(s), 52 déjà présente(s)`, toujours 52 documents dans `categories`. |
+| 3. Plusieurs catégories pour un morceau | Import avec Pop, R&B, Romantique, Joyeuse, Saint-Valentin : `201`, les 5 catégories sont renvoyées. |
+| 4. Enregistrement dans MongoDB | 5 documents dans `trackcategories` pour ce morceau (`trackId`, `categoryId`, `createdAt`). |
+| 5. Modification | `PUT` avec Rock + Énergique : `200`, la relecture renvoie bien ces 2 catégories. |
+| 6. Anciens morceaux | « Ocean eyes », « Fallin », « Ce monde » sont listés normalement avec `categories: []`. |
+| 7. Images | Une image de test `pop.jpg` est servie à travers le proxy Angular (`200 image/jpeg`) ; une image absente renvoie `404` et Angular affiche la vignette de remplacement. L'image de test a été supprimée ensuite. |
+| Suppression | `DELETE` : `204`, il ne reste aucune liaison pour ce morceau. |
+
+- `backend` : `npm test` → 10 réussis, 2 ignorés (tests MongoDB sans `MONGODB_TEST_URI`). Avec la base : le test d'intégration des catégories réussit.
+- `frontend-starter` : `npm test -- --build-target gpc:build` → 3 réussis ; `npm run build` → réussi, sans avertissement.
+
+## Reste à faire
+
+- Ajouter les 52 images dans `backend/data/uploads/categories/` (noms dans le `README.md` de ce dossier).
+- Vérifier l'affichage à l'œil dans le navigateur (ordinateur et mobile) : seules les requêtes HTTP ont été vérifiées automatiquement.
+- Redémarrer le backend déjà lancé pour qu'il prenne en compte les nouvelles routes, et relancer `ng serve` pour le nouveau proxy.
+
+# Catégories : retour à deux collections (`categories` et `tracks`)
+
+## Prompt
+
+> Le système de catégories fonctionne, mais je veux revenir à la conception prévue au départ : seulement deux collections, `categories` et `tracks`. Les catégories d'une musique doivent être rangées directement dans la musique, dans un tableau `categoryIds`. Il faut migrer les associations déjà enregistrées dans `trackcategories` sans en perdre aucune, vérifier la migration, puis supprimer cette collection. Toutes les fonctionnalités doivent rester les mêmes (sélecteur à trois onglets, ajout, modification, retrait, 52 catégories, sous-genres), les anciennes musiques doivent avoir un tableau vide, et les tests doivent être mis à jour. Pas de commit.
+
+## Analyse et choix retenus
+
+- Le tableau `categoryIds` dans `Track` suffit pour une relation plusieurs-à-plusieurs : une musique contient plusieurs identifiants, et un même identifiant peut se trouver dans plusieurs musiques.
+- Les **routes API restent les mêmes**. Les réponses gardent `categories` (le détail des catégories pour l'affichage) et ajoutent `categoryIds`. Le frontend n'a presque pas changé.
+- Avantages : à l'import, la piste et ses catégories sont enregistrées **en une seule écriture**. À la suppression d'une piste, ses catégories disparaissent avec elle, sans nettoyage à faire.
+- **Migration** dans un script séparé, comme `migrate:tracks-access`, et pas au démarrage : on la lance une fois, en connaissant le résultat.
+  - `$addToSet` ajoute les identifiants sans doublon et sans toucher aux autres champs.
+  - Le driver MongoDB est utilisé directement pour ne pas modifier `updatedAt`.
+  - La collection n'est supprimée que si chaque association est retrouvée dans `tracks`. Si une association pointe vers une piste qui n'existe plus, la collection est conservée.
+  - Option `--dry-run` pour simuler avant d'écrire.
+- Avant la migration, une copie des 3 associations et de la piste concernée a été sauvegardée dans un fichier JSON hors du projet.
+
+## Modifications
+
+| Fichier | Modification |
+|---|---|
+| `backend/src/models/Track.js` | Champ `categoryIds` (tableau d'ObjectId vers `Category`, `[]` par défaut), renvoyé par `toPublic()`. |
+| `backend/src/models/Category.js` | Reçoit `parseCategoryIds()` (validation des identifiants) et `categoriesForTracks()` (catégories de plusieurs pistes en une requête). |
+| `backend/src/models/TrackCategory.js` | **Supprimé.** |
+| `backend/src/app.js` | `POST /api/tracks` enregistre `categoryIds` dans la piste. `PUT /api/tracks/:id/categories` remplace le tableau avec `$set`. `GET /api/tracks` et `GET /api/tracks/:id/categories` lisent `categoryIds`. `DELETE` n'a plus de liaison à nettoyer. Le bloc d'annulation ajouté pour l'ancienne collection est retiré. |
+| `backend/src/server.js` | Plus de `TrackCategory.init()`. Avertissement au démarrage si `trackcategories` existe encore. |
+| `backend/src/migrations/migrate-track-categories.js` (nouveau) | Migration : lecture, regroupement par piste, copie, tableau vide pour les autres pistes, vérification, suppression. |
+| `backend/src/scripts/migrate-track-categories.js` (nouveau) et `backend/package.json` | Commande `npm run migrate:track-categories` (avec `--dry-run` possible). |
+| `backend/test/categories.test.js` | Tests adaptés à `Track.categoryIds` ; 2 tests de migration sur une base en mémoire (cas normal et cas où la collection doit être conservée). |
+| `frontend-starter/src/app/shared/models/track.model.ts` | Champ `categoryIds`. |
+| `frontend-starter/src/app/components/tracks-page/tracks-page.ts` | Après modification, la carte met à jour `categories` et `categoryIds`. |
+| `frontend-starter/src/app/components/tracks-page/tracks-page.spec.ts` | Nouveau test : modification des catégories dans la fenêtre (envoi du `PUT` et mise à jour de la carte). |
+| `API_CONTRACT.md` | Description de `tracks.categoryIds` et de la commande de migration. |
+
+## Base de données
+
+| Avant | Après |
+|---|---|
+| `categories` (52), `tracks`, `trackcategories` (3 associations) | `categories` (52, inchangées), `tracks` avec `categoryIds` |
+
+Exemple de document `tracks` après migration :
+
+```json
+{ "title": "Only Love", "categoryIds": ["<id Blues>", "<id Triste>", "<id Enfance>"], "...": "autres champs inchangés" }
+```
+
+## Résultat de la migration
+
+```text
+npm run migrate:track-categories -- --dry-run
+[migration] 3 association(s) lue(s) pour 1 piste(s), 0 vers une piste inexistante
+
+npm run migrate:track-categories
+[migration] 3 association(s) lue(s) pour 1 piste(s), 0 vers une piste inexistante
+[migration] 1 piste(s) complétée(s), 3 piste(s) ont reçu categoryIds = []
+[migration] 3/3 association(s) présente(s) dans tracks.categoryIds
+[migration] Vérification réussie : collection trackcategories supprimée
+```
+
+- **3 associations migrées sur 3**, toutes pour « Only Love » : Blues, Triste, Enfance.
+- Le `updatedAt` de « Only Love » est identique avant et après la migration.
+- « Ocean eyes », « Fallin » et « Ce monde » ont `categoryIds: []`.
+- Collections restantes : `acces`, `categories`, `tracks`, `users`.
+
+## Vérifications
+
+- `backend` : `npm test` → 12 réussis, 0 échec, 2 ignorés (tests MongoDB). Avec la base : le test d'intégration des catégories réussit (seed sans doublon, import avec 5 catégories, `tracks.categoryIds` vérifié dans MongoDB, modification, ancienne piste avec `[]`, suppression).
+- `frontend-starter` : `npm test -- --build-target gpc:build` → 4 réussis ; `npm run build` → réussi, sans avertissement.
+- À travers le proxy Angular :
+  - 52 catégories, dont 18 thèmes.
+  - Import de « All I Want for Christmas Is You » avec Pop, Joyeuse et Noël : `201`, et MongoDB contient ces 3 identifiants dans `tracks.categoryIds`.
+  - Modification avec 4 catégories, puis retrait de toutes (`[]`).
+  - « Only Love » s'affiche avec ses catégories migrées.
+  - Suppression de la musique de test : `204`. Aucune collection `trackcategories` n'a été recréée.
+
+## Reste à faire
+
+- Redémarrer le backend déjà lancé : s'il tourne avec l'ancien code, il pourrait recréer `trackcategories` lors d'un nouvel import. Dans ce cas, relancer `npm run migrate:track-categories`.
+- Vérifier l'affichage à l'œil dans le navigateur.
+- Ajouter les images des catégories (toujours absentes).

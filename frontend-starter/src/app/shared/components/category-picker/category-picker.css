@@ -1,0 +1,176 @@
+:host {
+  display: block;
+  /* One color per group, reused by tiles, placeholders and chips. */
+  --cat-genre: var(--primary-fg);
+  --cat-mood: #e08a2e;
+  --cat-theme: #8b5cf6;
+}
+
+.picker { display: grid; gap: 0.6rem; }
+.picker.disabled { opacity: 0.6; }
+
+[data-type='GENRE'] { --cat-color: var(--cat-genre); }
+[data-type='MOOD'] { --cat-color: var(--cat-mood); }
+[data-type='THEME'] { --cat-color: var(--cat-theme); }
+
+.hint { margin: 0; font-size: 0.82rem; font-weight: 400; color: var(--muted); }
+
+/* ---------- Selected summary ---------- */
+.summary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.link-button,
+.link-button:hover:not(:disabled) {
+  padding: 0;
+  font-size: 0.8rem;
+  color: var(--primary-fg);
+  background: none;
+  box-shadow: none;
+}
+.link-button:hover:not(:disabled) { text-decoration: underline; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0.4rem 0 0; padding: 0; list-style: none; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.15rem 0.2rem 0.15rem 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--cat-color);
+  background: color-mix(in srgb, var(--cat-color) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cat-color) 40%, transparent);
+  border-radius: 999px;
+}
+.chip-remove,
+.chip-remove:hover:not(:disabled) {
+  width: 1.3rem;
+  height: 1.3rem;
+  padding: 0;
+  font-size: 0.95rem;
+  line-height: 1;
+  color: inherit;
+  background: transparent;
+  border-radius: 50%;
+  box-shadow: none;
+}
+.chip-remove:hover:not(:disabled) { background: color-mix(in srgb, var(--cat-color) 22%, transparent); }
+
+/* ---------- Group tabs ---------- */
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.25rem;
+  padding: 0.25rem;
+  background: var(--primary-soft);
+  border-radius: 10px;
+}
+.tab,
+.tab:hover:not(:disabled) {
+  gap: 0.3rem;
+  padding: 0.45rem 0.3rem;
+  font-size: 0.8rem;
+  color: var(--primary-soft-fg);
+  background: transparent;
+  border-radius: 7px;
+  box-shadow: none;
+}
+.tab:hover:not(.active) { background: color-mix(in srgb, var(--surface) 50%, transparent); }
+.tab.active,
+.tab.active:hover { color: var(--text); background: var(--surface); box-shadow: var(--shadow-hover); }
+.tab-count {
+  min-width: 1.2rem;
+  padding: 0 0.3rem;
+  font-size: 0.7rem;
+  line-height: 1.2rem;
+  color: white;
+  background: var(--primary);
+  border-radius: 999px;
+}
+
+/* ---------- Tiles ---------- */
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(5.2rem, 1fr));
+  gap: 0.5rem;
+  max-height: 17rem;
+  margin: 0;
+  padding: 0.15rem;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.tile,
+.tile:hover:not(:disabled) {
+  display: grid;
+  gap: 0.3rem;
+  justify-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0.35rem;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  box-shadow: none;
+}
+.tile:hover:not(:disabled) { border-color: var(--cat-color); }
+.tile.selected,
+.tile.selected:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--cat-color) 12%, var(--surface));
+  border-color: var(--cat-color);
+}
+
+.tile-image {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 7px;
+}
+.tile-image img { width: 100%; height: 100%; object-fit: cover; }
+.tile-placeholder {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: white;
+  background: linear-gradient(135deg, var(--cat-color), color-mix(in srgb, var(--cat-color) 45%, #0b1f3a));
+}
+.tile-check {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  display: grid;
+  place-items: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  font-size: 0.75rem;
+  color: white;
+  background: var(--cat-color);
+  border: 2px solid white;
+  border-radius: 50%;
+}
+.tile-name {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 0.74rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+@media (max-width: 480px) {
+  .tiles { grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr)); max-height: 15rem; }
+  .tab { font-size: 0.74rem; }
+}

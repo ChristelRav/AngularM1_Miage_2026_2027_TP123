@@ -10,6 +10,9 @@ import mongoose from "mongoose";
 import { Acces } from "./models/Acces.js";
 import { User } from "./models/User.js";
 import { Track } from "./models/Track.js";
+import { Category, CATEGORY_TYPES } from "./models/Category.js";
+import { categoriesForTracks, parseCategoryIds } from "./models/Category.js";
+import { CATEGORY_IMAGES_DIR } from "./seeds/categories.seed.js";
 
 // Les fichiers audio restent sur le disque du serveur dans ce TP.
 // MongoDB ne conserve que leurs métadonnées : titre, nom, taille, etc.
@@ -53,6 +56,21 @@ async function removeUploadedFiles(files, context) {
       console.error(`[${context}] Impossible de supprimer le fichier ${uploadedPath}`, error);
     }
   }
+}
+
+/**
+ * Valide une liste d'identifiants de catégories reçue du client : format
+ * ObjectId puis existence de chaque catégorie active.
+ * Retourne { categoryIds } ou { error } (message pour une réponse 400).
+ */
+async function validateCategoryIds(raw) {
+  const categoryIds = parseCategoryIds(raw);
+  if (!categoryIds) return { error: "Identifiant de catégorie invalide" };
+  if (categoryIds.length) {
+    const found = await Category.countDocuments({ _id: { $in: categoryIds }, isActive: true });
+    if (found !== categoryIds.length) return { error: "Catégorie inconnue" };
+  }
+  return { categoryIds };
 }
 
 /**
@@ -165,6 +183,11 @@ export function createApp() {
   // accessible via req.body.
   // Il est placé avant les routes pour que toutes les requêtes JSON soient traitées.
   app.use(express.json());
+
+  // Images des catégories : publiques (une balise <img> n'envoie pas le JWT).
+  // Seul ce sous-dossier est exposé ; les fichiers audio et couvertures restent
+  // accessibles uniquement par les routes authentifiées.
+  app.use("/uploads/categories", express.static(CATEGORY_IMAGES_DIR, { index: false }));
 
   /** Endpoint public utilisé pour vérifier que l'API répond. */
   app.get("/api/health", (_req, res) => {
@@ -312,6 +335,86 @@ export function createApp() {
     }
   });
 
+  /** Liste les catégories actives, toutes ou filtrées par type (?type=GENRE|MOOD|THEME). */
+  app.get("/api/categories", auth, async (req, res, next) => {
+    try {
+      const filter = { isActive: true };
+      if (req.query.type !== undefined) {
+        const type = String(req.query.type).toUpperCase();
+        if (!CATEGORY_TYPES.includes(type)) {
+          console.warn(`[categories] Type inconnu : ${req.query.type}`);
+          return res.status(400).json({ message: "Type de catégorie invalide (GENRE, MOOD ou THEME)" });
+        }
+        filter.type = type;
+      }
+
+      const categories = await Category.find(filter).sort({ type: 1, name: 1 });
+      console.log(`[categories] ${categories.length} catégorie(s) envoyée(s)`);
+      res.json(categories.map((category) => category.toPublic()));
+    } catch (error) {
+      console.error("[categories] Erreur de lecture des catégories", error);
+      next(error);
+    }
+  });
+
+  /** Retourne les catégories d'une piste appartenant à l'utilisateur. */
+  app.get("/api/tracks/:id/categories", auth, async (req, res, next) => {
+    try {
+      if (!mongoose.isValidObjectId(req.params.id)) {
+        return res.status(400).json({ message: "Identifiant de piste invalide" });
+      }
+      const track = await Track.findOne({ _id: req.params.id, ownerId: req.auth.sub })
+        .select("categoryIds")
+        .lean();
+      if (!track) {
+        console.warn(`[categories] Piste introuvable ou interdite : ${req.params.id}`);
+        return res.status(404).json({ message: "Piste inconnue" });
+      }
+
+      const byTrack = await categoriesForTracks([track]);
+      res.json(byTrack.get(String(track._id)));
+    } catch (error) {
+      console.error("[categories] Erreur de lecture des catégories d'une piste", error);
+      next(error);
+    }
+  });
+
+  /** Remplace toutes les catégories d'une piste ({ categoryIds: [] } les retire toutes). */
+  app.put("/api/tracks/:id/categories", auth, async (req, res, next) => {
+    try {
+      if (!mongoose.isValidObjectId(req.params.id)) {
+        return res.status(400).json({ message: "Identifiant de piste invalide" });
+      }
+      if (!Array.isArray(req.body?.categoryIds)) {
+        return res.status(400).json({ message: "categoryIds doit être un tableau" });
+      }
+      const { categoryIds, error } = await validateCategoryIds(req.body.categoryIds);
+      if (error) {
+        console.warn(`[categories] Modification refusée : ${error}`);
+        return res.status(400).json({ message: error });
+      }
+      // Seul le tableau categoryIds de la piste est remplacé.
+      const track = await Track.findOneAndUpdate(
+        { _id: req.params.id, ownerId: req.auth.sub },
+        { $set: { categoryIds } },
+        { new: true, runValidators: true },
+      )
+        .select("categoryIds")
+        .lean();
+      if (!track) {
+        console.warn(`[categories] Piste introuvable ou interdite : ${req.params.id}`);
+        return res.status(404).json({ message: "Piste inconnue" });
+      }
+
+      const byTrack = await categoriesForTracks([track]);
+      console.log(`[categories] ${categoryIds.length} catégorie(s) pour la piste ${req.params.id}`);
+      res.json(byTrack.get(String(track._id)));
+    } catch (error) {
+      console.error("[categories] Erreur de modification des catégories", error);
+      next(error);
+    }
+  });
+
   app.get("/api/tracks", auth, async (req, res, next) => {
     try {
       const page = Math.max(1, Number(req.query.page) || 1);
@@ -337,6 +440,10 @@ export function createApp() {
         Track.countDocuments(filter),
       ]);
 
+      // Catégories de toutes les pistes de la page en une seule fois.
+      // Les anciennes pistes sans categoryIds reçoivent un tableau vide.
+      const categoriesByTrack = await categoriesForTracks(items);
+
       // items.map(track) crée un nouveau tableau publicItems en transformant chaque piste pour inclure 
       // uniquement les champs nécessaires à l'API.
       // L'identifiant MongoDB (_id) est converti en chaîne de caractères (id) pour être plus lisible 
@@ -352,6 +459,8 @@ export function createApp() {
               accesName: track.accesId.accesName,
             }
           : null,
+        categoryIds: (track.categoryIds ?? []).map(String),
+        categories: categoriesByTrack.get(String(track._id)) ?? [],
         _id: undefined,
       }));
 
@@ -449,6 +558,16 @@ export function createApp() {
           }
         }
 
+        // categoryIds est facultatif : champ multipart répété, un par catégorie.
+        const { categoryIds, error: categoryError } = await validateCategoryIds(
+          req.body.categoryIds,
+        );
+        if (categoryError) {
+          await removeUploadedFiles(req.files, "tracks");
+          console.warn(`[tracks] Upload refusé : ${categoryError}`);
+          return res.status(400).json({ message: categoryError });
+        }
+
         const track = await Track.create({
           ownerId: req.auth.sub,
           ...(accesId && { accesId }),
@@ -457,15 +576,23 @@ export function createApp() {
           storedName: audioFile.filename,
           mimeType: audioFile.mimetype,
           size: audioFile.size,
+          categoryIds,
           ...(coverFile && {
             coverStoredName: coverFile.filename,
             coverMimeType: coverFile.mimetype,
           }),
         });
 
+        const categoriesByTrack = await categoriesForTracks([track]);
+
         await track.populate("accesId", "accesName");
-        console.log(`[tracks] Upload enregistré : ${track.id}`);
-        res.status(201).json(track.toPublic());
+        console.log(
+          `[tracks] Upload enregistré : ${track.id} (${categoryIds.length} catégorie(s))`,
+        );
+        res.status(201).json({
+          ...track.toPublic(),
+          categories: categoriesByTrack.get(track.id) ?? [],
+        });
       } catch (error) {
         console.error("[tracks] Erreur après l'enregistrement du fichier", error);
 
