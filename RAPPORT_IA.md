@@ -878,3 +878,83 @@ npm run migrate:track-categories
 - Redémarrer le backend déjà lancé, sinon les routes d'amitié renvoient `404`.
 - Afficher les musiques des amis dans « Découvrir » : il faudra une route qui liste les pistes `public` / `friendly` des amis.
 - Ajouter une photo de profil au modèle `User` si on veut des avatars avec image (la cloche affiche pour l'instant les initiales).
+
+# Playlists et partage avec les amis
+
+## Prompt
+
+> Je développe les playlists en m'appuyant sur le système d'amitié. Modèle `Playlist` avec `ownerId`, `name`, `trackIds`, `sharedWith` et les timestamps, en références Mongoose vers `User` et `Track`. Le propriétaire crée, renomme, supprime sa playlist et y ajoute ou retire des musiques : pas de doublon, playlist vide autorisée, musiques vérifiées, et la suppression d'une playlist ne touche ni aux pistes ni aux fichiers. Il peut la partager avec un ou plusieurs amis : uniquement des relations `ACCEPTED`, jamais avec soi-même, sans doublon, et un utilisateur qui n'est plus ami perd l'accès. Un invité peut seulement consulter et écouter (pas d'ajout collaboratif pour l'instant). Toutes les routes sont protégées par JWT, avec les permissions vérifiées côté serveur. Côté Angular : une page avec « Mes playlists » (pochette, nombre de musiques, bouton écouter, menu ⋯) et « Partagées avec moi », un formulaire de création et une fenêtre de partage. La lecture réutilise le lecteur existant, dans l'ordre de `trackIds`, avec musique précédente et suivante, sans casser Butterchurn. Tests backend et frontend, build vérifié.
+
+## Analyse et choix retenus
+
+- **Lecture par un ami** : la route `GET /api/tracks/:id/audio` ne sert que le propriétaire de la piste, et doit le rester. J'ai ajouté des routes propres à la playlist (`/api/playlists/:id/tracks/:trackId/audio` et `/cover`). Elles vérifient l'accès à la playlist **et** que la piste en fait partie. Un ami n'a donc accès qu'aux pistes de la playlist partagée, jamais aux autres morceaux du propriétaire.
+- **Contrôle d'accès commun** : une fonction `findPlaylistFor()` est utilisée par toutes les routes `:id`.
+  - Le propriétaire a tous les droits.
+  - Un invité doit être dans `sharedWith` **et** toujours ami (`Friendship` `ACCEPTED`). Il reçoit `403` sur les routes de modification.
+  - Les autres reçoivent `404`, pour ne pas révéler l'existence de la playlist.
+  - L'amitié est vérifiée à chaque requête : la perte d'accès est immédiate, même si l'utilisateur est encore dans `sharedWith`. Il en est retiré quand le propriétaire consulte la liste de partage.
+- **Doublons** : l'ajout d'une musique se fait en une requête conditionnelle (« pas encore présente » + `$push`), et le partage utilise `$addToSet`. Le schéma refuse aussi les doublons et le partage avec soi-même.
+- **Musiques ajoutées** : elles doivent exister et appartenir au propriétaire, puisqu'il ne voit que ses propres pistes. Quand une piste est supprimée, elle est retirée des playlists qui la contenaient.
+- **Un seul lecteur** : j'ai réutilisé `app-track-player` en lui ajoutant seulement une sortie `ended`. La page de la playlist garde un lecteur unique, dont la source change pour la musique suivante ou précédente. La musique en cours passe donc par le même graphe audio, et le fond Butterchurn suit la playlist sans autre changement.
+- **Entrée de navigation** : l'entrée « Playlists » existait déjà dans la sidebar, marquée « Bientôt ». Je l'ai activée plutôt que d'ajouter un lien dans la barre du haut, qui aurait fait doublon avec la sidebar.
+- **Code partagé** : les actions du propriétaire (créer, renommer, partager, supprimer) sont dans `PlaylistActionsService`, utilisé par la liste et par la page d'une playlist. La pochette en mosaïque réutilise le cadre `.thumb` des vignettes. La suppression réutilise `ConfirmDialogComponent`.
+
+## Modifications
+
+| Fichier | Modification |
+|---|---|
+| `backend/src/models/Playlist.js` (nouveau) | Schéma `Playlist` : références `User`/`Track`, nom obligatoire (80 caractères au plus), refus des doublons et du partage avec soi-même, index `{ownerId, updatedAt}` et `{sharedWith}`. |
+| `backend/src/app.js` | 13 routes `/api/playlists…` ; fonctions `findPlaylistFor()` (droits), `publicPlaylists()` (réponse en 2 requêtes), `friendIdsOf()`, `parsePlaylistName()`. `DELETE /api/tracks/:id` retire la piste des playlists. |
+| `backend/src/server.js` | `Playlist.init()` au démarrage avec `Friendship.init()`. |
+| `backend/test/playlists.test.js` (nouveau) | Authentification des 13 routes, schéma, et test d'intégration MongoDB du parcours complet. |
+| `frontend-starter/src/app/shared/models/playlist.model.ts` (nouveau) | Interfaces `Playlist`, `PlaylistTrack`, `PlaylistShare`. |
+| `frontend-starter/src/app/shared/services/playlist.service.ts` (nouveau) | Appels HTTP, téléchargement des fichiers avec le JWT. |
+| `frontend-starter/src/app/shared/services/playlist-actions.service.ts` (nouveau) | Créer, renommer, partager, supprimer : fenêtre + appel API + message. |
+| `frontend-starter/src/app/shared/components/playlist-cover/` (nouveau) | Pochette : mosaïque de 4 couvertures, une seule couverture ou placeholder, toujours le même carré. |
+| `frontend-starter/src/app/shared/components/playlist-name-dialog/` (nouveau) | Formulaire du nom (création et renommage). |
+| `frontend-starter/src/app/shared/components/playlist-share-dialog/` (nouveau) | Amis ayant accès (bouton Retirer) et autres amis à cocher. |
+| `frontend-starter/src/app/shared/components/playlist-tracks-dialog/` (nouveau) | Ajout de ses backing tracks, page par page, celles déjà présentes marquées « Ajoutée ». |
+| `frontend-starter/src/app/components/playlists-page/` (réécrit, test nouveau) | « Mes playlists » (menu ⋯ : modifier le nom, partager, supprimer) et « Partagées avec moi » (lecture seule). Bouton « Créer une playlist ». |
+| `frontend-starter/src/app/components/playlist-page/` (nouveau, avec test) | Page `/playlists/:id` : musiques dans l'ordre, lecteur avec précédente/suivante et enchaînement automatique, actions du propriétaire seulement. |
+| `frontend-starter/src/app/shared/components/track-player/` (`.ts`, `.html`) | Sortie `ended` ajoutée. Le reste du lecteur n'a pas changé. |
+| `frontend-starter/src/app/routes.ts` | Route `playlists/:id`. |
+| `frontend-starter/src/app/shared/components/sidebar/` (`.ts`, test) | Playlists n'est plus marquée « Bientôt ». |
+| `frontend-starter/src/app/components/dashboard-page/` (`.ts`, `.html`, test) | Le nombre de playlists est le vrai nombre (`GET /api/playlists`). |
+| `API_CONTRACT.md` | Section « Playlists » : routes, droits, formats et erreurs. |
+
+## Base de données
+
+- Nouvelle collection `playlists`, index `{ownerId: 1, updatedAt: -1}` et `{sharedWith: 1}` créés au démarrage.
+- Exemple de document :
+
+```json
+{ "ownerId": "<id Demo>", "name": "Session du soir", "trackIds": ["<id Ce monde>", "<id Only love>"], "sharedWith": ["<id Lucas>"], "createdAt": "...", "updatedAt": "..." }
+```
+
+- `friendships` est seulement lue. `users` et `tracks` ne sont pas modifiés. Aucune migration n'est nécessaire.
+
+## Vérifications
+
+| Vérification | Résultat |
+|---|---|
+| Authentification | Les 13 routes renvoient `401` sans JWT. |
+| Gestion | Nom vide `400` ; playlist vide `201` ; ajout `201` ; doublon `409` ; musique d'un autre utilisateur `404` ; ordre de `trackIds` respecté ; retrait `204` ; renommage `200`. |
+| Partage | Refusé avant l'amitié (`400`) et avec soi-même (`400`). Après l'amitié : un seul exemplaire dans `sharedWith`, même en envoyant deux fois le même ami. |
+| Invité | Consultation et écoute `200` (contenu du fichier vérifié) ; accès direct à `/api/tracks/:id/audio` refusé (`404`) ; renommer, supprimer, ajouter, retirer, gérer le partage : `403`. |
+| Non invité | Playlist et fichiers : `404`. |
+| Fin de l'amitié | Accès perdu immédiatement (`404`), playlist absente de « Partagées avec moi », utilisateur retiré de `sharedWith`. |
+| Suppression | Playlist `204` ; les pistes et leurs fichiers audio sont toujours là. Une piste supprimée est retirée des playlists. |
+| Chrome, compte démo (propriétaire) | Création de « Session du soir » ; ajout des 2 musiques ; « Écouter » lance un seul lecteur (1/2), « Suivante » puis « Précédente » changent de musique ; le fond Butterchurn est actif pendant la lecture ; partage avec Lucas (« Ont accès (1) »). |
+| Chrome mobile, Lucas (invité) | La playlist apparaît dans « Partagées avec moi » avec « par Demo », sans menu ⋯ ; la lecture fonctionne ; aucun bouton de modification ; pas de débordement horizontal. |
+
+- `backend` : `npm test` → 17 réussis, 4 ignorés (tests MongoDB). Avec la base : le parcours complet des playlists réussit. Le test des accès échoue toujours, comme avant ces modifications (voir la section précédente).
+- `frontend-starter` : `npm test -- --build-target gpc:build` → 23 réussis ; `npm run build` → réussi, sans avertissement.
+- Les comptes, amitiés, playlists et pistes créés pour les tests ont été supprimés ; les 2 pistes du compte démo sont intactes.
+
+## Reste à faire
+
+- **Retirer un ami** : la fin d'une amitié est bien gérée par les playlists, mais il n'existe pas encore de route pour retirer un ami. Dans les tests, elle a été simulée en base.
+- **Ajout collaboratif** de musiques par les invités : volontairement non développé.
+- **Ordre des musiques** : on ne peut pas encore les réordonner ; elles sont ajoutées à la fin.
+- **Accès des pistes** : une piste « privée » ajoutée à une playlist partagée est écoutable par les amis invités. J'ai considéré le partage comme un choix explicite du propriétaire.
+- Redémarrer le backend et `ng serve` pour tester dans le navigateur.

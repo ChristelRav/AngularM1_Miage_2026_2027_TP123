@@ -8,6 +8,7 @@ import {
   ElementRef,
   inject,
   input,
+  output,
   signal,
   viewChild,
 } from '@angular/core';
@@ -39,6 +40,8 @@ export class TrackPlayerComponent {
   readonly src = input.required<string>();
   /** Track title, used in the accessible labels. */
   readonly label = input.required<string>();
+  /** Emitted when the track reaches its end (used by playlists to go to the next track). */
+  readonly ended = output<void>();
 
   private readonly audioContext = inject(AudioContextService);
   private readonly destroyRef = inject(DestroyRef);
@@ -128,6 +131,11 @@ export class TrackPlayerComponent {
     this.playing.set(false);
     this.releasePlayingSource();
     cancelAnimationFrame(this.frame);
+  }
+
+  onEnded(): void {
+    this.onPause();
+    this.ended.emit();
   }
 
   onLoadedMetadata(): void {

@@ -55,6 +55,6 @@ describe('SidebarComponent', () => {
     const soon = [...element.querySelectorAll('a')]
       .filter((link) => link.querySelector('.soon'))
       .map((link) => link.getAttribute('href'));
-    expect(soon).toEqual(['/discover', '/playlists', '/albums']);
+    expect(soon).toEqual(['/discover', '/albums']);
   });
 });

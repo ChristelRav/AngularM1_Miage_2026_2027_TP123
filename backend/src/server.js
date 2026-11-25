@@ -3,6 +3,7 @@ import { createApp } from "./app.js";
 import { ensureDefaultAcces } from "./models/Acces.js";
 import { User } from "./models/User.js";
 import { Friendship } from "./models/Friendship.js";
+import { Playlist } from "./models/Playlist.js";
 import { LEGACY_COLLECTION } from "./migrations/migrate-track-categories.js";
 import { ensureDefaultCategories } from "./seeds/categories.seed.js";
 
@@ -53,11 +54,12 @@ try {
 }
 
 try {
-  // Crée les index de friendships (dont l'index unique du couple) avant la première requête.
-  await Friendship.init();
-  console.log("[startup] Index de la collection friendships prêts");
+  // Crée les index de friendships (dont l'index unique du couple) et de playlists
+  // avant la première requête.
+  await Promise.all([Friendship.init(), Playlist.init()]);
+  console.log("[startup] Index des collections friendships et playlists prêts");
 } catch (error) {
-  console.error("[startup] Impossible de préparer les index des amitiés", error);
+  console.error("[startup] Impossible de préparer les index des amitiés et des playlists", error);
   throw error;
 }
 

@@ -29,6 +29,19 @@ Le contrat HTTP ne dépend pas du choix de persistance : le backend fourni utili
 | PATCH | `/friendships/:id/accept` | JWT | `200 Friendship` acceptée |
 | PATCH | `/friendships/:id/reject` | JWT | `200 Friendship` refusée |
 | GET | `/friends` | JWT | `200 Friend[]`, amis de l'utilisateur |
+| GET | `/playlists` | JWT | `200 Playlist[]` de l'utilisateur |
+| POST | `/playlists` | `{name}` + JWT | `201 Playlist` (vide) |
+| GET | `/playlists/shared` | JWT | `200 Playlist[]` partagées par des amis |
+| GET | `/playlists/:id` | JWT (propriétaire ou ami invité) | `200 Playlist` avec `tracks` |
+| PATCH | `/playlists/:id` | `{name}` + JWT (propriétaire) | `200 Playlist` |
+| DELETE | `/playlists/:id` | JWT (propriétaire) | `204` |
+| POST | `/playlists/:id/tracks` | `{trackId}` + JWT (propriétaire) | `201 Playlist` avec `tracks` |
+| DELETE | `/playlists/:id/tracks/:trackId` | JWT (propriétaire) | `204` |
+| GET | `/playlists/:id/tracks/:trackId/audio` | JWT (propriétaire ou ami invité) | flux audio |
+| GET | `/playlists/:id/tracks/:trackId/cover` | JWT (propriétaire ou ami invité) | image de couverture |
+| GET | `/playlists/:id/shares` | JWT (propriétaire) | `200 PlaylistShare[]` |
+| POST | `/playlists/:id/shares` | `{userIds: string[]}` + JWT (propriétaire) | `200 PlaylistShare[]` |
+| DELETE | `/playlists/:id/shares/:userId` | JWT (propriétaire) | `204` |
 
 `Page<Track>` contient `items`, `page`, `limit`, `total` et `pages`. Formats audio acceptés : MP3, WAV, OGG et M4A, 25 Mo maximum. L'image facultative `cover` accepte JPEG, PNG ou WebP ; `Track.coverUrl` vaut `null` pour les pistes sans couverture.
 
@@ -60,5 +73,22 @@ Collection `friendships` : `{_id, user1Id, user2Id, requestedBy, status, created
 - `GET /friendships/received` : demandes `PENDING` dont l'utilisateur est le destinataire, les plus récentes d'abord (utilisées par la cloche de notification). `GET /friendships/sent` : demandes `PENDING` envoyées par l'utilisateur.
 - `PATCH /friendships/:id/accept` et `PATCH /friendships/:id/reject` : sans corps. Seul le **destinataire** d'une demande `PENDING` peut y répondre. Erreurs : `400` identifiant invalide ; `401` ; `403` l'expéditeur tente de répondre à sa propre demande ; `404` demande inconnue ou dont l'utilisateur ne fait pas partie ; `409` demande déjà traitée.
 - `GET /friends` : relations `ACCEPTED` de l'utilisateur, triées de la plus récente à la plus ancienne.
+
+### Playlists
+
+Collection `playlists` : `{_id, ownerId, name, trackIds, sharedWith, createdAt, updatedAt}`. `ownerId` et `sharedWith` référencent `User`, `trackIds` référence `Track` (ordre de lecture). `name` est obligatoire (1 à 80 caractères après suppression des espaces). Une playlist peut être vide ; une même piste ou un même utilisateur ne peut pas apparaître deux fois ; le propriétaire ne peut pas être dans `sharedWith`. Supprimer une playlist ne supprime ni les pistes ni leurs fichiers. Supprimer une piste (`DELETE /tracks/:id`) la retire des playlists qui la contenaient.
+
+**Droits.** Le propriétaire peut tout faire. Un utilisateur présent dans `sharedWith` **et** ami du propriétaire (`Friendship` `ACCEPTED`) est un invité : il peut seulement consulter la playlist et écouter ses pistes (`403` sur les autres routes). Un utilisateur qui n'est plus ami perd l'accès, même s'il est encore dans `sharedWith`. Pour tous les autres, une playlist renvoie `404` (son existence n'est pas révélée).
+
+`Playlist` (réponse) : `{id, name, owner: {id, name}, isOwner, trackIds, trackCount, covers, sharedWithCount?, tracks?, createdAt, updatedAt}`. `trackIds` et `trackCount` ne comptent que les pistes qui existent encore. `covers` contient jusqu'à 4 URL de pochettes pour la mosaïque. `sharedWithCount` n'est envoyé qu'au propriétaire. `tracks` (routes de détail, d'ajout, de création et de renommage) liste les pistes dans l'ordre : `{id, title, originalName, mimeType, size, createdAt, coverUrl, audioUrl}`, avec des URL de la playlist (`/api/playlists/:id/tracks/:trackId/audio|cover`), utilisables par les invités. `PlaylistShare` : `{id, name}`.
+
+- `POST /playlists`, `PATCH /playlists/:id` : `400` si le nom est vide ou dépasse 80 caractères.
+- `POST /playlists/:id/tracks` : `{ "trackId": "<ObjectId>" }`, la piste est ajoutée à la fin. Erreurs : `400` identifiant invalide ; `404` piste inconnue ou n'appartenant pas au propriétaire ; `409` piste déjà dans la playlist.
+- `DELETE /playlists/:id/tracks/:trackId` : `404` si la piste n'est pas dans la playlist.
+- `GET /playlists/:id/tracks/:trackId/audio|cover` : `404` si la piste n'est pas dans la playlist ou n'a pas de couverture.
+- `GET /playlists/:id/shares` : amis ayant accès. Les utilisateurs qui ne sont plus amis sont retirés de `sharedWith` à cette occasion.
+- `POST /playlists/:id/shares` : `{ "userIds": ["<ObjectId>", ...] }`, sans doublon (`$addToSet`). Erreurs : `400` liste vide ou invalide, partage avec soi-même, ou utilisateur qui n'est pas un ami.
+- `DELETE /playlists/:id/shares/:userId` : `404` si l'utilisateur n'avait pas accès.
+- Toutes les routes `:id` : `400` identifiant invalide, `401`, `403` invité sur une route du propriétaire, `404` playlist inconnue ou inaccessible.
 
 Erreurs courantes : `400` validation, `401` authentification, `404` ressource, `409` valeur déjà utilisée.

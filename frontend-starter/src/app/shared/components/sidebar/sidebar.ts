@@ -60,7 +60,7 @@ export class SidebarComponent {
       title: 'Bibliothèque',
       links: [
         { path: '/tracks', label: 'Backing Tracks', icon: 'music' },
-        { path: '/playlists', label: 'Playlists', icon: 'list-music', soon: true },
+        { path: '/playlists', label: 'Playlists', icon: 'list-music' },
         { path: '/albums', label: 'Albums', icon: 'disc', soon: true },
       ],
     },

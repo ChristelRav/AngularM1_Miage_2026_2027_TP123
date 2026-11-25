@@ -19,10 +19,10 @@
           <span class="card-icon"><app-icon [name]="stat.icon" /></span>
           <span class="stat-text">
             <span class="stat-label">{{ stat.label }}</span>
-            @if (stat.value === null) {
-              <span class="stat-soon">Bientôt disponible</span>
-            } @else if (loading()) {
+            @if (stat.loading) {
               <span class="stat-value" aria-label="Chargement">…</span>
+            } @else if (stat.value === null) {
+              <span class="stat-soon">{{ stat.link === '/albums' ? 'Bientôt disponible' : '—' }}</span>
             } @else {
               <span class="stat-value">{{ stat.value }}</span>
             }

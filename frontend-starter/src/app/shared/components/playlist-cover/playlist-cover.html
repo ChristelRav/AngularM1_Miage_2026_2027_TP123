@@ -1,0 +1,7 @@
+<span class="thumb cover" [class.mosaic]="images().length === 4">
+  @for (url of images(); track url) {
+    <img [src]="url" [alt]="$first ? 'Pochette de la playlist ' + name() : ''" />
+  } @empty {
+    <span class="thumb-placeholder" aria-hidden="true"><app-icon name="list-music" /></span>
+  }
+</span>

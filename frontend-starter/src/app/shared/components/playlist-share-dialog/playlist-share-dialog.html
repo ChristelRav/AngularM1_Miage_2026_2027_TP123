@@ -1,0 +1,58 @@
+<h2 mat-dialog-title>Partager « {{ data.playlist.name }} »</h2>
+<mat-dialog-content>
+  <p class="hint">Vos amis pourront écouter cette playlist, sans pouvoir la modifier.</p>
+
+  @if (error(); as message) {
+    <p class="error" role="alert"><app-icon name="alert" />{{ message }}</p>
+  }
+
+  @if (loading()) {
+    <p class="hint">Chargement…</p>
+  } @else {
+    <h3>Ont accès ({{ shares().length }})</h3>
+    <ul class="people">
+      @for (share of shares(); track share.id) {
+        <li>
+          <span class="avatar" aria-hidden="true">{{ initialsOf(share.name) }}</span>
+          <b class="person-name">{{ share.name }}</b>
+          <button
+            type="button"
+            class="btn-danger-ghost small"
+            (click)="unshare(share)"
+            [disabled]="saving()"
+            [attr.aria-label]="'Retirer l’accès de ' + share.name"
+          >
+            <app-icon name="x" />Retirer
+          </button>
+        </li>
+      } @empty {
+        <li class="empty">Cette playlist n’est partagée avec personne.</li>
+      }
+    </ul>
+
+    <h3>Vos amis</h3>
+    @if (!friends().length) {
+      <p class="empty">Vous n’avez pas encore d’amis. Ajoutez-en depuis votre profil.</p>
+    } @else {
+      <ul class="people" aria-label="Amis à qui partager la playlist">
+        @for (friend of available(); track friend.id) {
+          <li>
+            <label class="pick">
+              <input type="checkbox" [checked]="selected().has(friend.id)" (change)="toggle(friend)" [disabled]="saving()" />
+              <span class="avatar" aria-hidden="true">{{ initialsOf(friend.name) }}</span>
+              <b class="person-name">{{ friend.name }}</b>
+            </label>
+          </li>
+        } @empty {
+          <li class="empty">Tous vos amis ont déjà accès à cette playlist.</li>
+        }
+      </ul>
+    }
+  }
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button type="button" class="btn-ghost" [mat-dialog-close]="shares().length">Terminé</button>
+  <button type="button" (click)="share()" [disabled]="!selected().size || saving()">
+    <app-icon name="send" />Partager{{ selected().size ? ' (' + selected().size + ')' : '' }}
+  </button>
+</mat-dialog-actions>

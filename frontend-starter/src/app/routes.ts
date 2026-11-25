@@ -5,6 +5,7 @@ import { DashboardPageComponent } from './components/dashboard-page/dashboard-pa
 import { DiscoverPageComponent } from './components/discover-page/discover-page';
 import { LoginPageComponent } from './components/login-page/login-page';
 import { MusicLabPageComponent } from './components/music-lab-page/music-lab-page';
+import { PlaylistPageComponent } from './components/playlist-page/playlist-page';
 import { PlaylistsPageComponent } from './components/playlists-page/playlists-page';
 import { ProfilePageComponent } from './components/profile-page/profile-page';
 import { RegisterPageComponent } from './components/register-page/register-page';
@@ -22,6 +23,7 @@ export const routes: Routes = [
   // Bibliothèque
   { path: 'tracks', component: TracksPageComponent, canActivate: [authGuard] },
   { path: 'playlists', component: PlaylistsPageComponent, canActivate: [authGuard] },
+  { path: 'playlists/:id', component: PlaylistPageComponent, canActivate: [authGuard] },
   { path: 'albums', component: AlbumsPageComponent, canActivate: [authGuard] },
   // Outils
   { path: 'visualizer', component: VisualizerPageComponent, canActivate: [authGuard] },

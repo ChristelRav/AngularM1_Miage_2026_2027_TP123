@@ -1,0 +1,18 @@
+:host { display: block; }
+
+/* Square frame shared with every thumbnail of the app (see `.thumb` in styles.css). */
+.cover { --thumb-radius: 12px; font-size: 2rem; }
+
+/*
+ * Four covers: each one fills a quarter of the same square. Absolute positioning (like `.thumb`)
+ * means an image can never make the square bigger.
+ */
+.cover.mosaic > img { width: 50%; height: 50%; }
+.cover.mosaic > img:nth-child(2) { left: 50%; }
+.cover.mosaic > img:nth-child(3) { top: 50%; }
+.cover.mosaic > img:nth-child(4) { top: 50%; left: 50%; }
+
+.cover > .thumb-placeholder {
+  color: white;
+  background: linear-gradient(135deg, var(--blue-600), var(--blue-900));
+}

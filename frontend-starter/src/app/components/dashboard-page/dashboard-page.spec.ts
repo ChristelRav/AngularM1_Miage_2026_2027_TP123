@@ -40,7 +40,7 @@ describe('DashboardPageComponent', () => {
     vi.restoreAllMocks();
   });
 
-  it('shows the real track count and the latest tracks, without invented numbers', () => {
+  it('shows the real track and playlist counts and the latest tracks, without invented numbers', () => {
     httpTesting.expectOne('/api/tracks?page=1&limit=4').flush({
       items: [track('t1', 'Only Love', '/api/tracks/t1/cover'), track('t2', 'Ocean eyes')],
       page: 1,
@@ -49,6 +49,7 @@ describe('DashboardPageComponent', () => {
       pages: 2,
     });
     httpTesting.expectOne('/api/tracks/t1/cover').flush(new Blob(['x'], { type: 'image/png' }));
+    httpTesting.expectOne('/api/playlists').flush([{ id: 'p1' }, { id: 'p2' }]);
     fixture.detectChanges();
 
     const stats = [...element.querySelectorAll('.stat')].map((stat) => [
@@ -57,7 +58,7 @@ describe('DashboardPageComponent', () => {
     ]);
     expect(stats).toEqual([
       ['Musiques importées', '7'],
-      ['Playlists', 'Bientôt disponible'],
+      ['Playlists', '2'],
       ['Albums', 'Bientôt disponible'],
     ]);
 
@@ -71,11 +72,13 @@ describe('DashboardPageComponent', () => {
 
   it('shows an error with a retry button when the API fails', () => {
     httpTesting.expectOne('/api/tracks?page=1&limit=4').flush({ message: 'Erreur' }, { status: 500, statusText: 'Error' });
+    httpTesting.expectOne('/api/playlists').flush([]);
     fixture.detectChanges();
     expect(element.querySelector('[role="alert"]')).not.toBeNull();
 
     element.querySelector<HTMLButtonElement>('.retry')?.click();
     httpTesting.expectOne('/api/tracks?page=1&limit=4').flush({ items: [], page: 1, limit: 4, total: 0, pages: 0 });
+    httpTesting.expectOne('/api/playlists').flush([]);
     fixture.detectChanges();
     expect(element.querySelector('[role="alert"]')).toBeNull();
     expect(element.querySelector('.empty')?.textContent).toContain('Aucune musique');
