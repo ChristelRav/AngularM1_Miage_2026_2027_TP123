@@ -11,6 +11,7 @@ import { Acces } from "./models/Acces.js";
 import { User } from "./models/User.js";
 import { Track } from "./models/Track.js";
 import { Category, CATEGORY_TYPES } from "./models/Category.js";
+import { Friendship, orderedPair } from "./models/Friendship.js";
 import { categoriesForTracks, parseCategoryIds } from "./models/Category.js";
 import { CATEGORY_IMAGES_DIR } from "./seeds/categories.seed.js";
 
@@ -71,6 +72,63 @@ async function validateCategoryIds(raw) {
     if (found !== categoryIds.length) return { error: "Catégorie inconnue" };
   }
   return { categoryIds };
+}
+
+/**
+ * Prépare des relations d'amitié pour la réponse HTTP : récupère le nom de
+ * l'autre utilisateur de chaque relation en une seule requête.
+ */
+async function publicFriendships(friendships, viewerId) {
+  const otherIds = friendships.map((friendship) => friendship.otherUserId(viewerId));
+  const users = await User.find({ _id: { $in: otherIds } }).select("name");
+  const usersById = new Map(users.map((user) => [user.id, user]));
+  return friendships.map((friendship) => friendship.toPublicFor(viewerId, usersById));
+}
+
+/**
+ * Accepte ou refuse une demande d'amitié. Seul le destinataire (l'utilisateur
+ * de la relation qui n'est pas `requestedBy`) peut répondre, et seulement tant
+ * que la demande est en attente. La mise à jour est faite en une seule requête
+ * conditionnelle : deux réponses simultanées ne peuvent pas s'écraser.
+ */
+async function answerFriendRequest(req, res, next, status) {
+  const label = status === "ACCEPTED" ? "acceptée" : "refusée";
+  try {
+    const me = req.auth.sub;
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      console.warn(`[friends] Identifiant de demande invalide : ${id}`);
+      return res.status(400).json({ message: "Identifiant de demande invalide" });
+    }
+
+    const friendship = await Friendship.findOneAndUpdate(
+      { _id: id, ...Friendship.involving(me), status: "PENDING", requestedBy: { $ne: me } },
+      { $set: { status } },
+      { new: true, runValidators: true },
+    );
+
+    if (!friendship) {
+      // Explique pourquoi la mise à jour n'a pas eu lieu, sans révéler les demandes des autres.
+      const existing = await Friendship.findOne({ _id: id, ...Friendship.involving(me) });
+      if (!existing) {
+        console.warn(`[friends] Demande ${id} inconnue pour ${me}`);
+        return res.status(404).json({ message: "Demande d'amitié inconnue" });
+      }
+      if (existing.status !== "PENDING") {
+        console.warn(`[friends] Demande ${id} déjà traitée (${existing.status})`);
+        return res.status(409).json({ message: "Cette demande a déjà été traitée" });
+      }
+      console.warn(`[friends] ${me} a tenté de répondre à sa propre demande ${id}`);
+      return res.status(403).json({ message: "Seul le destinataire peut répondre à cette demande" });
+    }
+
+    console.log(`[friends] Demande ${friendship.id} ${label} par ${me}`);
+    const [publicFriendship] = await publicFriendships([friendship], me);
+    res.json(publicFriendship);
+  } catch (error) {
+    console.error(`[friends] Erreur : demande non ${label}`, error);
+    next(error);
+  }
 }
 
 /**
@@ -697,6 +755,138 @@ export function createApp() {
       res.status(204).end();
     } catch (error) {
       console.error("[tracks] Erreur de suppression", error);
+      next(error);
+    }
+  });
+
+  /*
+   * Amitiés. Une seule relation par couple d'utilisateurs (voir models/Friendship.js).
+   * L'utilisateur connecté est toujours celui du JWT (req.auth.sub) : il ne peut
+   * envoyer, lire, accepter ou refuser que les demandes qui le concernent.
+   */
+
+  /** Envoie une demande d'amitié à un utilisateur désigné par son email (ou son id). */
+  app.post("/api/friendships", auth, async (req, res, next) => {
+    try {
+      const me = req.auth.sub;
+      const { email, userId } = req.body || {};
+      let target;
+
+      if (userId !== undefined) {
+        if (!mongoose.isValidObjectId(userId)) {
+          console.warn(`[friends] Identifiant d'utilisateur invalide envoyé par ${me}`);
+          return res.status(400).json({ message: "Identifiant d'utilisateur invalide" });
+        }
+        target = await User.findById(userId);
+      } else if (typeof email === "string" && email.trim()) {
+        target = await User.findOne({ email: email.trim().toLowerCase() });
+      } else {
+        console.warn(`[friends] Demande sans destinataire envoyée par ${me}`);
+        return res.status(400).json({ message: "Email de l'utilisateur requis" });
+      }
+
+      if (!target) {
+        console.warn(`[friends] Destinataire inconnu pour la demande de ${me}`);
+        return res.status(404).json({ message: "Aucun utilisateur avec cet email" });
+      }
+      if (target.id === me) {
+        console.warn(`[friends] ${me} a tenté de s'envoyer une demande`);
+        return res.status(400).json({ message: "Vous ne pouvez pas vous envoyer une demande d'amitié" });
+      }
+
+      // Vérifie la relation existante, dans un sens comme dans l'autre (couple ordonné).
+      let friendship = await Friendship.findOne(orderedPair(me, target.id));
+      if (friendship?.status === "ACCEPTED") {
+        console.warn(`[friends] ${me} et ${target.id} sont déjà amis`);
+        return res.status(409).json({ message: "Vous êtes déjà amis" });
+      }
+      if (friendship?.status === "PENDING") {
+        const sentByMe = String(friendship.requestedBy) === me;
+        console.warn(`[friends] Demande déjà en attente entre ${me} et ${target.id}`);
+        return res.status(409).json({
+          message: sentByMe
+            ? "Demande déjà envoyée, en attente de réponse"
+            : "Cet utilisateur vous a déjà envoyé une demande : répondez-y depuis vos notifications",
+        });
+      }
+
+      if (friendship) {
+        // Demande refusée auparavant : elle peut être renvoyée, la relation est réutilisée.
+        friendship.status = "PENDING";
+        friendship.requestedBy = me;
+        await friendship.save();
+        console.log(`[friends] Demande renvoyée : ${friendship.id} (${me} -> ${target.id})`);
+      } else {
+        friendship = await Friendship.create({ user1Id: me, user2Id: target.id, requestedBy: me });
+        console.log(`[friends] Demande créée : ${friendship.id} (${me} -> ${target.id})`);
+      }
+
+      res.status(201).json(friendship.toPublicFor(me, new Map([[target.id, target]])));
+    } catch (error) {
+      // Deux demandes simultanées pour le même couple : l'index unique refuse la seconde.
+      if (error?.code === 11000) {
+        console.warn("[friends] Relation déjà créée par une requête simultanée", error);
+        return res.status(409).json({ message: "Une relation existe déjà avec cet utilisateur" });
+      }
+      console.error("[friends] Erreur d'envoi de la demande", error);
+      next(error);
+    }
+  });
+
+  /** Demandes reçues en attente (celles affichées dans les notifications). */
+  app.get("/api/friendships/received", auth, async (req, res, next) => {
+    try {
+      const me = req.auth.sub;
+      const friendships = await Friendship.find({
+        ...Friendship.involving(me),
+        status: "PENDING",
+        requestedBy: { $ne: me },
+      }).sort({ createdAt: -1 });
+      console.log(`[friends] ${friendships.length} demande(s) reçue(s) pour ${me}`);
+      res.json(await publicFriendships(friendships, me));
+    } catch (error) {
+      console.error("[friends] Erreur de lecture des demandes reçues", error);
+      next(error);
+    }
+  });
+
+  /** Demandes envoyées par l'utilisateur et toujours en attente. */
+  app.get("/api/friendships/sent", auth, async (req, res, next) => {
+    try {
+      const me = req.auth.sub;
+      const friendships = await Friendship.find({ requestedBy: me, status: "PENDING" }).sort({ createdAt: -1 });
+      console.log(`[friends] ${friendships.length} demande(s) envoyée(s) par ${me}`);
+      res.json(await publicFriendships(friendships, me));
+    } catch (error) {
+      console.error("[friends] Erreur de lecture des demandes envoyées", error);
+      next(error);
+    }
+  });
+
+  app.patch("/api/friendships/:id/accept", auth, (req, res, next) =>
+    answerFriendRequest(req, res, next, "ACCEPTED"),
+  );
+  app.patch("/api/friendships/:id/reject", auth, (req, res, next) =>
+    answerFriendRequest(req, res, next, "REJECTED"),
+  );
+
+  /** Liste des amis (relations acceptées) de l'utilisateur connecté. */
+  app.get("/api/friends", auth, async (req, res, next) => {
+    try {
+      const me = req.auth.sub;
+      const friendships = await Friendship.find({ ...Friendship.involving(me), status: "ACCEPTED" }).sort({
+        updatedAt: -1,
+      });
+      const friends = (await publicFriendships(friendships, me)).map((friendship) => ({
+        id: friendship.user.id,
+        name: friendship.user.name,
+        friendshipId: friendship.id,
+        since: friendship.updatedAt,
+      }));
+      console.log(`[friends] ${friends.length} ami(s) pour ${me}`);
+      res.json(friends);
+    } catch (error) {
+      console.error("[friends] Erreur de lecture de la liste d'amis", error);
       next(error);
     }
   });

@@ -806,3 +806,75 @@ npm run migrate:track-categories
 - Redémarrer le backend déjà lancé : s'il tourne avec l'ancien code, il pourrait recréer `trackcategories` lors d'un nouvel import. Dans ce cas, relancer `npm run migrate:track-categories`.
 - Vérifier l'affichage à l'œil dans le navigateur.
 - Ajouter les images des catégories (toujours absentes).
+
+# Système d'amitié et notifications
+
+## Prompt
+
+> J'ajoute un système d'amitié à l'application. Côté données : une collection `friendships` gérée avec Mongoose (`user1Id`, `user2Id`, `requestedBy`, `status` parmi `PENDING`/`ACCEPTED`/`REJECTED`, timestamps), avec une seule relation possible entre deux utilisateurs, même si l'ordre de la demande est inversé : il faut donc normaliser l'ordre du couple et poser les index nécessaires. Pas de demande à soi-même, pas de nouvelle demande quand on est déjà amis. Côté API : envoyer une demande, voir les demandes reçues et envoyées, accepter, refuser, voir ses amis, toujours limité à l'utilisateur connecté. Côté interface : une cloche dans la navbar avec le nombre de demandes en attente et un menu pour accepter ou refuser, en gardant le style actuel. Uniquement des vraies données du backend, et rien de cassé dans l'existant.
+
+## Analyse et choix retenus
+
+- Toutes les routes du projet sont dans `backend/src/app.js` (pas de dossier `controllers/`) : les routes d'amitié y sont ajoutées dans le même style (middleware `auth`, logs, `try/catch`, `next(error)`).
+- **Unicité du couple** : avant chaque sauvegarde, `user1Id` et `user2Id` sont remis dans l'ordre (le plus petit en premier). « A demande B » et « B demande A » donnent donc le même couple, et l'index unique `{user1Id, user2Id}` refuse le doublon, même si deux requêtes arrivent en même temps.
+- **Règles métier vérifiées côté serveur** : pas de demande à soi-même, `requestedBy` doit être l'un des deux utilisateurs, relation existante contrôlée avant toute création (`409` si déjà amis ou si une demande est déjà en attente, dans un sens ou dans l'autre).
+- **Demande refusée** : la consigne interdit seulement de renvoyer une demande acceptée. J'ai choisi d'autoriser le renvoi après un refus, en réutilisant la même relation (elle repasse en `PENDING`), pour garder un seul document par couple.
+- **Permissions** : seul le destinataire peut accepter ou refuser (`403` pour l'expéditeur), et seulement une demande `PENDING` (`409` sinon). La mise à jour se fait en une seule requête conditionnelle, donc deux clics simultanés ne peuvent pas donner deux réponses différentes. Une demande qui ne concerne pas l'utilisateur renvoie `404`, sans indiquer qu'elle existe.
+- **Envoi d'une demande** : par l'email du compte, car c'est la seule information qu'un utilisateur connaît de l'autre. Les réponses ne renvoient que le **nom** de l'autre utilisateur, jamais son email.
+- **Photo de profil** : le modèle `User` n'a pas de champ photo (`name`, `email`, `createdAt`). Je n'ai pas modifié le modèle : l'interface affiche le nom et un avatar avec les initiales.
+- **Cloche** : le badge compte les demandes reçues en attente renvoyées par l'API. Il est rechargé à l'ouverture du menu, après chaque « Accepter » / « Refuser », toutes les minutes quand l'onglet est visible, et quand on revient sur l'onglet.
+- **Envoyer une demande depuis l'interface** : la consigne ne décrit que la cloche, mais sans formulaire d'envoi aucune notification ne pourrait apparaître. J'ai ajouté une carte « Mes amis » à la page Profil existante : envoi par email, liste des amis, demandes envoyées en attente.
+
+## Modifications
+
+| Fichier | Modification |
+|---|---|
+| `backend/src/models/Friendship.js` (nouveau) | Schéma `Friendship`, statuts, normalisation de l'ordre du couple et validations dans `pre("validate")`, index unique `{user1Id, user2Id}` et index `{user1Id, status}`, `{user2Id, status}`. Méthodes `involves()`, `otherUserId()`, `toPublicFor()` et filtre `Friendship.involving()`. |
+| `backend/src/app.js` | 6 routes authentifiées : `POST /api/friendships`, `GET /api/friendships/received`, `GET /api/friendships/sent`, `PATCH /api/friendships/:id/accept`, `PATCH /api/friendships/:id/reject`, `GET /api/friends`. Fonctions `publicFriendships()` (noms des utilisateurs en une requête) et `answerFriendRequest()` (accepter / refuser). |
+| `backend/src/server.js` | `Friendship.init()` au démarrage : les index existent avant la première requête. |
+| `backend/test/friendships.test.js` (nouveau) | Authentification des 6 routes, schéma (statuts, index unique, ordre normalisé, demande à soi-même, `requestedBy` extérieur) et test d'intégration MongoDB du parcours complet. |
+| `frontend-starter/src/app/shared/models/friendship.model.ts` (nouveau) | Interfaces `Friendship` et `Friend`, calcul des initiales pour l'avatar. |
+| `frontend-starter/src/app/shared/services/friendship.service.ts` (nouveau) | Appels HTTP ; Signal `received` et `pendingCount` partagés par la cloche ; compteur `version` pour recharger le profil après un changement. |
+| `frontend-starter/src/app/shared/components/notification-bell/` (nouveau, avec test) | Cloche, badge, menu des demandes reçues avec « Accepter » / « Refuser », message quand il n'y a rien, fermeture au clic extérieur ou avec Échap, panneau pleine largeur sur mobile. |
+| `frontend-starter/src/app/components/app/app.html` et `app.ts` | Ajout de la cloche dans la navbar, avant « Profil », seulement quand l'utilisateur est connecté. Le reste de la navbar n'est pas modifié. |
+| `frontend-starter/src/app/components/profile-page/` (`.ts`, `.html`, `.css`, test nouveau) | Carte « Mes amis » sous le profil : formulaire d'envoi par email, liste des amis, demandes envoyées. |
+| `frontend-starter/src/app/shared/components/icon/icon.ts` | Icônes Lucide `bell`, `check`, `x`, `send`. |
+| `frontend-starter/src/app/components/discover-page/discover-page.ts` | Texte de l'onglet « Musiques de mes amis » mis à jour : les amis existent, l'affichage de leurs musiques reste à faire. |
+| `API_CONTRACT.md` | Nouvelle section « Amitiés » : routes, formats, règles et erreurs. |
+
+## Base de données
+
+- Nouvelle collection `friendships`, avec les index `{user1Id: 1, user2Id: 1}` (unique), `{user1Id: 1, status: 1}` et `{user2Id: 1, status: 1}`, créés au démarrage du backend.
+- Exemple de document après une demande de B vers A (A ayant le plus petit identifiant) :
+
+```json
+{ "user1Id": "<id A>", "user2Id": "<id B>", "requestedBy": "<id B>", "status": "PENDING", "createdAt": "...", "updatedAt": "..." }
+```
+
+- Les collections `users`, `tracks`, `categories` et `acces` ne sont pas modifiées. Aucune migration n'est nécessaire.
+
+## Vérifications
+
+| Vérification | Résultat |
+|---|---|
+| Authentification | Les 6 routes renvoient `401` sans JWT. |
+| Doublons | Après A → B, une nouvelle demande A → B et une demande B → A renvoient `409`. Un seul document existe pour le couple, enregistré dans l'ordre. |
+| Validations | Demande à soi-même `400`, email inconnu `404`, identifiant invalide `400`. |
+| Permissions | L'expéditeur qui veut accepter sa propre demande reçoit `403` ; un autre utilisateur reçoit `404`. |
+| Acceptation | `200`, la demande sort des demandes reçues, les deux utilisateurs se voient dans `GET /api/friends`. Une demande acceptée ne peut plus être renvoyée (`409` dans les deux sens). |
+| Refus puis renvoi | Refus `200` ; le renvoi réutilise la même relation (`201`, même `id`). |
+| Cloche dans Chrome (compte démo) | 2 demandes envoyées par deux comptes temporaires : badge **2**, menu avec noms et initiales ; « Accepter » → badge **1** ; « Refuser » → plus de badge et message « Aucune nouvelle demande d'amitié ». |
+| Profil dans Chrome | Liste d'amis à jour après l'acceptation depuis la cloche. Messages du serveur affichés : « Vous êtes déjà amis », « Vous ne pouvez pas vous envoyer une demande d'amitié », « Demande envoyée à … ». |
+| Mobile (390 px) | Le menu prend la largeur de l'écran sous la barre du haut, sans débordement horizontal. |
+
+- `backend` : `npm test` → 15 réussis, 3 ignorés (tests MongoDB). Avec la base : les 4 tests d'amitié réussissent, dont le parcours complet ; les comptes de test sont supprimés à la fin.
+- Le test d'intégration des accès (`api.test.js`) échoue avec la base réelle, **avec ou sans ces modifications** : il compare l'id de l'accès « privé » à un id déjà présent dans la base. Ce n'est pas lié aux amitiés.
+- `frontend-starter` : `npm test -- --build-target gpc:build` → 16 réussis ; `npm run build` → réussi, sans avertissement.
+- Pendant la vérification dans Chrome, j'ai trouvé et corrigé un bug du formulaire d'envoi : `(ngSubmit)` ne se déclenchait pas sans `[formGroup]`. Un test le couvre maintenant.
+- Les deux comptes temporaires et leurs relations ont été supprimés après la vérification : `friendships` est vide.
+
+## Reste à faire
+
+- Redémarrer le backend déjà lancé, sinon les routes d'amitié renvoient `404`.
+- Afficher les musiques des amis dans « Découvrir » : il faudra une route qui liste les pistes `public` / `friendly` des amis.
+- Ajouter une photo de profil au modèle `User` si on veut des avatars avec image (la cloche affiche pour l'instant les initiales).

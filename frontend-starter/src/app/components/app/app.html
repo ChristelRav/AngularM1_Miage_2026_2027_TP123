@@ -8,6 +8,9 @@
   </a>
 
   <nav aria-label="Navigation principale">
+    @if (auth.isAuthenticated()) {
+      <app-notification-bell />
+    }
     <a class="nav-link" routerLink="/profile" routerLinkActive="active" ariaCurrentWhenActive="page">
       <app-icon name="user" /><span class="nav-label">Profil</span>
     </a>

@@ -15,8 +15,9 @@ interface DiscoverTab {
 
 /**
  * Prepared page. The API only lists the tracks of the signed-in user (`GET /api/tracks` filters on
- * the owner): discovering other users' tracks needs new backend routes, and friends need a friendship
- * model. Until then the page shows no data, only what each tab will contain.
+ * the owner): discovering other users' tracks needs new backend routes. Friendships exist (Friendship
+ * model, managed from the profile page), but there is no route yet for the tracks of one's friends.
+ * Until then the page shows no data, only what each tab will contain.
  */
 @Component({
   imports: [RouterLink, ComingSoonComponent, IconComponent],
@@ -39,7 +40,7 @@ export class DiscoverPageComponent {
       icon: 'users',
       heading: 'Les musiques partagées par vos amis',
       message:
-        'Vous retrouverez ici les backing tracks que vos amis partagent avec leurs amis (accès « friendly »), en plus de leurs musiques publiques. La gestion des amis reste à développer.',
+        'Vous retrouverez ici les backing tracks que vos amis partagent avec leurs amis (accès « friendly »), en plus de leurs musiques publiques. Vous pouvez déjà ajouter des amis depuis votre profil ; l’affichage de leurs musiques reste à développer.',
     },
   ];
   readonly source = signal<DiscoverSource>('public');

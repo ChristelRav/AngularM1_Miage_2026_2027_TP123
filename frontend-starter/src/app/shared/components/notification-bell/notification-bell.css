@@ -1,0 +1,147 @@
+:host { position: relative; display: inline-flex; }
+
+/* Same look as the other round icon buttons of the navbar (.nav-link.theme-toggle in app.css). */
+.bell,
+.bell:hover:not(:disabled) {
+  position: relative;
+  padding: 0.55rem;
+  font-size: 1.05rem;
+  color: #ffffffd9;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  box-shadow: none;
+}
+.bell:hover:not(:disabled) { color: white; background: #ffffff1f; }
+.bell.active { color: white; background: #ffffff2e; border-color: #ffffff40; }
+.bell:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.badge {
+  position: absolute;
+  top: 0.05rem;
+  right: 0.05rem;
+  display: grid;
+  place-items: center;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding: 0 0.25rem;
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--blue-900);
+  background: var(--accent);
+  border: 2px solid var(--blue-800);
+  border-radius: 999px;
+}
+
+/* ---------- Dropdown ---------- */
+.panel {
+  position: absolute;
+  top: calc(100% + 0.6rem);
+  right: 0;
+  z-index: 30;
+  width: min(23rem, calc(100vw - 2rem));
+  overflow: hidden;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.9rem 1rem 0.7rem;
+  border-bottom: 1px solid var(--line);
+}
+.panel-head h2 { margin: 0; font-size: 1rem; }
+.count {
+  padding: 0 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.3rem;
+  color: var(--primary-soft-fg);
+  background: var(--primary-soft);
+  border-radius: 999px;
+}
+
+.panel-error {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.6rem 1rem 0;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.82rem;
+  color: var(--danger-fg);
+  background: var(--danger-bg);
+  border-radius: 8px;
+}
+
+.requests { max-height: 22rem; margin: 0; padding: 0.3rem 0; overflow-y: auto; list-style: none; }
+
+.request {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.35rem 0.75rem;
+  align-items: center;
+  padding: 0.7rem 1rem;
+}
+.request + .request { border-top: 1px solid var(--line); }
+
+/* Initials (the User model has no profile picture). */
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--blue-900);
+  background: linear-gradient(135deg, var(--accent), #f0a85a);
+  border-radius: 50%;
+}
+
+.request-text { display: grid; min-width: 0; }
+.request-text b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.request-text small { font-size: 0.78rem; color: var(--muted); }
+
+.request-actions { grid-column: 2; display: flex; gap: 0.4rem; }
+.request-actions button { flex: 1; gap: 0.3rem; padding: 0.4rem 0.6rem; font-size: 0.82rem; }
+.reject { color: var(--danger-fg); background: var(--danger-bg); }
+.reject:hover:not(:disabled) { color: white; background: var(--danger); box-shadow: 0 4px 12px #b42a2a40; }
+
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 1.6rem 1rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.panel-foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.7rem;
+  font-size: 0.88rem;
+  text-decoration: none;
+  background: var(--surface-2);
+  border-top: 1px solid var(--line);
+}
+
+/* Phones: the panel spans the screen width under the top bar. */
+@media (max-width: 560px) {
+  .bell { padding: 0.6rem; }
+  .panel {
+    position: fixed;
+    top: calc(var(--topbar-height, 3.7rem) + 0.4rem);
+    right: 0.5rem;
+    left: 0.5rem;
+    width: auto;
+  }
+}

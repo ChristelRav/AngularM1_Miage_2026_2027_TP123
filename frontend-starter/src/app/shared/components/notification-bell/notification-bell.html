@@ -1,0 +1,77 @@
+@let count = friendships.pendingCount();
+<button
+  type="button"
+  class="bell"
+  [class.active]="open()"
+  (click)="toggle()"
+  [attr.aria-expanded]="open()"
+  aria-controls="notification-panel"
+  [attr.aria-label]="
+    count ? 'Notifications : ' + count + ' demande(s) d’amitié en attente' : 'Notifications : aucune demande en attente'
+  "
+  title="Demandes d’amitié"
+>
+  <app-icon name="bell" />
+  @if (count) {
+    <span class="badge" aria-hidden="true">{{ count > 9 ? '9+' : count }}</span>
+  }
+</button>
+
+@if (open()) {
+  <div id="notification-panel" class="panel" role="dialog" aria-label="Demandes d’amitié reçues">
+    <div class="panel-head">
+      <h2>Demandes d’amitié</h2>
+      @if (count) {
+        <span class="count">{{ count }}</span>
+      }
+    </div>
+
+    @if (error(); as message) {
+      <p class="panel-error" role="alert"><app-icon name="alert" />{{ message }}</p>
+    }
+
+    <ul class="requests" aria-live="polite">
+      @for (request of friendships.received(); track request.id) {
+        <li class="request">
+          <span class="avatar" aria-hidden="true">{{ initialsOf(request.user.name) }}</span>
+          <span class="request-text">
+            <b>{{ request.user.name }}</b>
+            <small>veut devenir votre ami·e · {{ request.createdAt | shortDate }}</small>
+          </span>
+          <span class="request-actions">
+            <button
+              type="button"
+              class="accept"
+              (click)="accept(request)"
+              [disabled]="busyId() === request.id"
+              [attr.aria-label]="'Accepter la demande de ' + request.user.name"
+            >
+              <app-icon name="check" />Accepter
+            </button>
+            <button
+              type="button"
+              class="reject"
+              (click)="reject(request)"
+              [disabled]="busyId() === request.id"
+              [attr.aria-label]="'Refuser la demande de ' + request.user.name"
+            >
+              <app-icon name="x" />Refuser
+            </button>
+          </span>
+        </li>
+      } @empty {
+        <li class="empty">
+          @if (loading()) {
+            Chargement…
+          } @else {
+            <app-icon name="bell" />Aucune nouvelle demande d’amitié.
+          }
+        </li>
+      }
+    </ul>
+
+    <a class="panel-foot" routerLink="/profile" (click)="close()">
+      <app-icon name="users" />Gérer mes amis
+    </a>
+  </div>
+}

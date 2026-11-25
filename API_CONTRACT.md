@@ -23,6 +23,12 @@ Le contrat HTTP ne dépend pas du choix de persistance : le backend fourni utili
 | GET | `/tracks/:id/categories` | JWT | `200 Category[]` de la piste (`[]` si aucune) |
 | PUT | `/tracks/:id/categories` | `{categoryIds: string[]}` + JWT | `200 Category[]` après remplacement |
 | GET | `/uploads/categories/<slug>.jpg` (hors `/api`) | public | image de la catégorie, `404` si absente |
+| POST | `/friendships` | `{email}` (ou `{userId}`) + JWT | `201 Friendship` envoyée |
+| GET | `/friendships/received` | JWT | `200 Friendship[]` reçues en attente (`PENDING`) |
+| GET | `/friendships/sent` | JWT | `200 Friendship[]` envoyées en attente (`PENDING`) |
+| PATCH | `/friendships/:id/accept` | JWT | `200 Friendship` acceptée |
+| PATCH | `/friendships/:id/reject` | JWT | `200 Friendship` refusée |
+| GET | `/friends` | JWT | `200 Friend[]`, amis de l'utilisateur |
 
 `Page<Track>` contient `items`, `page`, `limit`, `total` et `pages`. Formats audio acceptés : MP3, WAV, OGG et M4A, 25 Mo maximum. L'image facultative `cover` accepte JPEG, PNG ou WebP ; `Track.coverUrl` vaut `null` pour les pistes sans couverture.
 
@@ -43,5 +49,16 @@ La commande `npm run migrate:track-categories` (depuis `backend`, option `--dry-
 - `GET /tracks/:id/categories` : `400` identifiant invalide ; `401` ; `404` piste inconnue ou appartenant à un autre utilisateur.
 - `PUT /tracks/:id/categories` : corps `{ "categoryIds": ["<ObjectId>", ...] }`, qui remplace toutes les catégories de la piste (`[]` les retire toutes). Erreurs : `400` si `categoryIds` n'est pas un tableau, si un identifiant est invalide ou si une catégorie est inconnue/inactive ; `401` ; `404` piste inconnue ou appartenant à un autre utilisateur.
 - `GET /uploads/categories/<fichier>` : route publique (une balise `<img>` n'envoie pas le JWT), limitée à ce dossier. Les fichiers audio et couvertures restent accessibles uniquement par les routes authentifiées.
+
+### Amitiés
+
+Collection `friendships` : `{_id, user1Id, user2Id, requestedBy, status, createdAt, updatedAt}`, avec `status` égal à `PENDING`, `ACCEPTED` ou `REJECTED`. Le couple est enregistré dans un ordre fixe (`user1Id` < `user2Id`) et un index unique `{user1Id, user2Id}` garantit **une seule relation par couple d'utilisateurs**, quel que soit celui qui envoie la demande. `requestedBy` est l'expéditeur. Toutes les routes utilisent l'utilisateur du JWT : on ne peut lire ou modifier que les relations dont on fait partie.
+
+`Friendship` (réponse) : `{id, status, direction, user: {id, name}, createdAt, updatedAt}`. `direction` vaut `SENT` ou `RECEIVED` du point de vue de l'utilisateur connecté ; `user` est toujours **l'autre** utilisateur (nom seulement, son email n'est pas renvoyé). `Friend` : `{id, name, friendshipId, since}`.
+
+- `POST /friendships` : corps `{ "email": "ami@exemple.com" }` (ou `{ "userId": "<ObjectId>" }`). Erreurs : `400` destinataire absent, identifiant invalide ou demande à soi-même ; `401` ; `404` « Aucun utilisateur avec cet email » ; `409` si les deux utilisateurs sont déjà amis, si une demande est déjà en attente dans un sens ou dans l'autre. Une demande **refusée** peut être renvoyée : la même relation repasse en `PENDING` avec le nouvel expéditeur. Une demande **acceptée** ne peut pas être renvoyée.
+- `GET /friendships/received` : demandes `PENDING` dont l'utilisateur est le destinataire, les plus récentes d'abord (utilisées par la cloche de notification). `GET /friendships/sent` : demandes `PENDING` envoyées par l'utilisateur.
+- `PATCH /friendships/:id/accept` et `PATCH /friendships/:id/reject` : sans corps. Seul le **destinataire** d'une demande `PENDING` peut y répondre. Erreurs : `400` identifiant invalide ; `401` ; `403` l'expéditeur tente de répondre à sa propre demande ; `404` demande inconnue ou dont l'utilisateur ne fait pas partie ; `409` demande déjà traitée.
+- `GET /friends` : relations `ACCEPTED` de l'utilisateur, triées de la plus récente à la plus ancienne.
 
 Erreurs courantes : `400` validation, `401` authentification, `404` ressource, `409` valeur déjà utilisée.
