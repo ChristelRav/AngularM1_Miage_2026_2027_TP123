@@ -1,0 +1,40 @@
+<section>
+  <div class="hero">
+    <p class="eyebrow">ACCUEIL</p>
+    <h1>Découvrir</h1>
+    <p>Écoutez les backing tracks partagées par la communauté et par vos amis.</p>
+  </div>
+
+  <article class="card">
+    <div class="segmented" role="tablist" aria-label="Origine des musiques">
+      @for (tab of tabs; track tab.source) {
+        <button
+          type="button"
+          role="tab"
+          class="segment"
+          [id]="'discover-tab-' + tab.source"
+          [class.active]="source() === tab.source"
+          [attr.aria-selected]="source() === tab.source"
+          [attr.aria-controls]="'discover-panel'"
+          [attr.data-source]="tab.source"
+          (click)="source.set(tab.source)"
+        >
+          <app-icon [name]="tab.icon" />{{ tab.label }}
+        </button>
+      }
+    </div>
+
+    @let tab = activeTab();
+    <div id="discover-panel" role="tabpanel" [attr.aria-labelledby]="'discover-tab-' + tab.source">
+      <app-coming-soon [icon]="tab.icon" [heading]="tab.heading" [message]="tab.message">
+        <p class="rules">
+          Les droits d’accès actuels seront respectés : vous ne pourrez écouter que les musiques
+          que leur propriétaire a choisi de partager.
+        </p>
+        <a class="soon-link" routerLink="/tracks">
+          <app-icon name="music" />Gérer l’accès de mes backing tracks
+        </a>
+      </app-coming-soon>
+    </div>
+  </article>
+</section>

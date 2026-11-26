@@ -11,3 +11,73 @@
     </form>
   }
 </section>
+
+<section class="card friends">
+  <div class="card-header">
+    <span class="card-icon"><app-icon name="users" /></span>
+    <h2>Mes amis</h2>
+  </div>
+  <p class="subtitle">
+    Ajoutez un ami avec l’email de son compte. Les demandes que vous recevez arrivent dans la cloche
+    <app-icon name="bell" /> en haut de l’écran.
+  </p>
+
+  <form class="send-form" [formGroup]="friendForm" (ngSubmit)="sendRequest()">
+    <label>
+      Email de votre ami
+      <input
+        type="email"
+        formControlName="email"
+        placeholder="ami@exemple.com"
+        autocomplete="off"
+        [attr.aria-invalid]="friendEmail.touched && friendEmail.invalid"
+      />
+    </label>
+    <button type="submit" [disabled]="sending()"><app-icon name="send" />Envoyer la demande</button>
+  </form>
+  @if (friendEmail.touched && friendEmail.invalid) {
+    <p class="field-error">Saisissez une adresse email valide.</p>
+  }
+  @if (sendResult(); as result) {
+    <p [class]="result.ok ? 'send-ok' : 'error'" role="status">
+      <app-icon [name]="result.ok ? 'check' : 'alert'" />{{ result.message }}
+    </p>
+  }
+  @if (friendsError(); as message) {
+    <p class="error" role="alert">
+      <app-icon name="alert" />{{ message }}
+      <button type="button" class="btn-ghost retry" (click)="loadFriends()">Réessayer</button>
+    </p>
+  }
+
+  <h3>Amis ({{ friends().length }})</h3>
+  <ul class="people">
+    @for (friend of friends(); track friend.id) {
+      <li>
+        <span class="avatar" aria-hidden="true">{{ initialsOf(friend.name) }}</span>
+        <span class="person-text">
+          <b>{{ friend.name }}</b>
+          <small>Amis depuis le {{ friend.since | shortDate }}</small>
+        </span>
+      </li>
+    } @empty {
+      <li class="empty">Vous n’avez pas encore d’amis sur Guitar Cloud.</li>
+    }
+  </ul>
+
+  @if (sentRequests().length) {
+    <h3>Demandes envoyées</h3>
+    <ul class="people">
+      @for (request of sentRequests(); track request.id) {
+        <li>
+          <span class="avatar pending" aria-hidden="true">{{ initialsOf(request.user.name) }}</span>
+          <span class="person-text">
+            <b>{{ request.user.name }}</b>
+            <small>Envoyée le {{ request.createdAt | shortDate }}</small>
+          </span>
+          <span class="status">En attente</span>
+        </li>
+      }
+    </ul>
+  }
+</section>

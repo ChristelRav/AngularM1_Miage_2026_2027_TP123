@@ -11,6 +11,8 @@ import { Acces } from "./models/Acces.js";
 import { User } from "./models/User.js";
 import { Track } from "./models/Track.js";
 import { Category, CATEGORY_TYPES } from "./models/Category.js";
+import { Friendship, orderedPair } from "./models/Friendship.js";
+import { Playlist, PLAYLIST_NAME_MAX } from "./models/Playlist.js";
 import { categoriesForTracks, parseCategoryIds } from "./models/Category.js";
 import { CATEGORY_IMAGES_DIR } from "./seeds/categories.seed.js";
 
@@ -71,6 +73,173 @@ async function validateCategoryIds(raw) {
     if (found !== categoryIds.length) return { error: "Catégorie inconnue" };
   }
   return { categoryIds };
+}
+
+/**
+ * Prépare des relations d'amitié pour la réponse HTTP : récupère le nom de
+ * l'autre utilisateur de chaque relation en une seule requête.
+ */
+async function publicFriendships(friendships, viewerId) {
+  const otherIds = friendships.map((friendship) => friendship.otherUserId(viewerId));
+  const users = await User.find({ _id: { $in: otherIds } }).select("name");
+  const usersById = new Map(users.map((user) => [user.id, user]));
+  return friendships.map((friendship) => friendship.toPublicFor(viewerId, usersById));
+}
+
+/**
+ * Accepte ou refuse une demande d'amitié. Seul le destinataire (l'utilisateur
+ * de la relation qui n'est pas `requestedBy`) peut répondre, et seulement tant
+ * que la demande est en attente. La mise à jour est faite en une seule requête
+ * conditionnelle : deux réponses simultanées ne peuvent pas s'écraser.
+ */
+async function answerFriendRequest(req, res, next, status) {
+  const label = status === "ACCEPTED" ? "acceptée" : "refusée";
+  try {
+    const me = req.auth.sub;
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      console.warn(`[friends] Identifiant de demande invalide : ${id}`);
+      return res.status(400).json({ message: "Identifiant de demande invalide" });
+    }
+
+    const friendship = await Friendship.findOneAndUpdate(
+      { _id: id, ...Friendship.involving(me), status: "PENDING", requestedBy: { $ne: me } },
+      { $set: { status } },
+      { new: true, runValidators: true },
+    );
+
+    if (!friendship) {
+      // Explique pourquoi la mise à jour n'a pas eu lieu, sans révéler les demandes des autres.
+      const existing = await Friendship.findOne({ _id: id, ...Friendship.involving(me) });
+      if (!existing) {
+        console.warn(`[friends] Demande ${id} inconnue pour ${me}`);
+        return res.status(404).json({ message: "Demande d'amitié inconnue" });
+      }
+      if (existing.status !== "PENDING") {
+        console.warn(`[friends] Demande ${id} déjà traitée (${existing.status})`);
+        return res.status(409).json({ message: "Cette demande a déjà été traitée" });
+      }
+      console.warn(`[friends] ${me} a tenté de répondre à sa propre demande ${id}`);
+      return res.status(403).json({ message: "Seul le destinataire peut répondre à cette demande" });
+    }
+
+    console.log(`[friends] Demande ${friendship.id} ${label} par ${me}`);
+    const [publicFriendship] = await publicFriendships([friendship], me);
+    res.json(publicFriendship);
+  } catch (error) {
+    console.error(`[friends] Erreur : demande non ${label}`, error);
+    next(error);
+  }
+}
+
+/** Identifiants des amis (relations ACCEPTED) d'un utilisateur. */
+async function friendIdsOf(userId) {
+  const friendships = await Friendship.find({ ...Friendship.involving(userId), status: "ACCEPTED" }).select(
+    "user1Id user2Id",
+  );
+  return new Set(friendships.map((friendship) => String(friendship.otherUserId(userId))));
+}
+
+/** Vérifie et nettoie le nom d'une playlist. Retourne { name } ou { error }. */
+function parsePlaylistName(raw) {
+  const name = typeof raw === "string" ? raw.trim() : "";
+  if (!name) return { error: "Le nom de la playlist est requis" };
+  if (name.length > PLAYLIST_NAME_MAX) {
+    return { error: `Le nom de la playlist ne doit pas dépasser ${PLAYLIST_NAME_MAX} caractères` };
+  }
+  return { name };
+}
+
+/**
+ * Charge la playlist :id et vérifie les droits de l'utilisateur connecté.
+ * - Le propriétaire a tous les droits.
+ * - Un invité doit être dans sharedWith ET toujours ami (Friendship ACCEPTED)
+ *   avec le propriétaire : un ancien ami perd l'accès, même s'il est encore
+ *   dans sharedWith. Il peut seulement consulter et écouter (`ownerOnly` → 403).
+ * - Pour les autres, 404 : on ne révèle pas l'existence de la playlist.
+ * Retourne { playlist, isOwner }, ou null quand la réponse d'erreur est déjà envoyée.
+ */
+async function findPlaylistFor(req, res, { ownerOnly }) {
+  const me = req.auth.sub;
+  const { id } = req.params;
+  if (!mongoose.isValidObjectId(id)) {
+    console.warn(`[playlists] Identifiant de playlist invalide : ${id}`);
+    res.status(400).json({ message: "Identifiant de playlist invalide" });
+    return null;
+  }
+
+  const playlist = await Playlist.findById(id);
+  const isOwner = playlist && String(playlist.ownerId) === me;
+  const invited =
+    playlist &&
+    !isOwner &&
+    playlist.sharedWith.some((userId) => String(userId) === me) &&
+    (await friendIdsOf(me)).has(String(playlist.ownerId));
+
+  if (!isOwner && !invited) {
+    console.warn(`[playlists] Playlist ${id} inconnue ou non accessible pour ${me}`);
+    res.status(404).json({ message: "Playlist inconnue" });
+    return null;
+  }
+  if (ownerOnly && !isOwner) {
+    console.warn(`[playlists] ${me} (invité) a tenté de modifier la playlist ${id}`);
+    res.status(403).json({ message: "Seul le propriétaire peut modifier cette playlist" });
+    return null;
+  }
+  return { playlist, isOwner };
+}
+
+/**
+ * Prépare des playlists pour la réponse HTTP, en 2 requêtes au total : les
+ * pistes (pour le nombre et les pochettes) et le nom des propriétaires.
+ * Les références vers des pistes supprimées sont ignorées.
+ * Avec `withTracks`, ajoute le détail des pistes dans l'ordre de trackIds.
+ */
+async function publicPlaylists(playlists, viewerId, { withTracks = false } = {}) {
+  const tracks = await Track.find({ _id: { $in: playlists.flatMap((playlist) => playlist.trackIds) } }).select(
+    "+coverStoredName",
+  );
+  const tracksById = new Map(tracks.map((track) => [track.id, track]));
+  const owners = await User.find({ _id: { $in: playlists.map((playlist) => playlist.ownerId) } }).select("name");
+  const ownersById = new Map(owners.map((owner) => [owner.id, owner.name]));
+
+  return playlists.map((playlist) => {
+    const isOwner = String(playlist.ownerId) === String(viewerId);
+    const playlistTracks = playlist.trackIds.map((id) => tracksById.get(String(id))).filter(Boolean);
+    // Fichiers servis par les routes de la playlist : elles marchent aussi pour les invités.
+    const fileUrl = (track, file) => `/api/playlists/${playlist.id}/tracks/${track.id}/${file}`;
+    return {
+      id: playlist.id,
+      name: playlist.name,
+      owner: { id: String(playlist.ownerId), name: ownersById.get(String(playlist.ownerId)) ?? "Utilisateur supprimé" },
+      isOwner,
+      trackIds: playlistTracks.map((track) => track.id),
+      trackCount: playlistTracks.length,
+      // Jusqu'à 4 pochettes pour la mosaïque de la carte.
+      covers: playlistTracks
+        .filter((track) => track.coverStoredName)
+        .slice(0, 4)
+        .map((track) => fileUrl(track, "cover")),
+      // Seul le propriétaire voit avec combien de personnes la playlist est partagée.
+      ...(isOwner ? { sharedWithCount: playlist.sharedWith.length } : {}),
+      ...(withTracks
+        ? {
+            tracks: playlistTracks.map((track) => ({
+              id: track.id,
+              title: track.title,
+              originalName: track.originalName,
+              mimeType: track.mimeType,
+              size: track.size,
+              createdAt: track.createdAt,
+              coverUrl: track.coverStoredName ? fileUrl(track, "cover") : null,
+              audioUrl: fileUrl(track, "audio"),
+            })),
+          }
+        : {}),
+      createdAt: playlist.createdAt,
+      updatedAt: playlist.updatedAt,
+    };
+  });
 }
 
 /**
@@ -676,6 +845,12 @@ export function createApp() {
         return res.status(404).json({ message: "Piste inconnue" });
       }
 
+      // La piste n'existe plus : elle est retirée des playlists qui la contenaient.
+      const playlists = await Playlist.updateMany({ trackIds: track._id }, { $pull: { trackIds: track._id } });
+      if (playlists.modifiedCount) {
+        console.log(`[tracks] Piste ${track.id} retirée de ${playlists.modifiedCount} playlist(s)`);
+      }
+
       const storedFiles = [track.storedName, track.coverStoredName].filter(Boolean);
       const failedFiles = [];
       for (const storedName of storedFiles) {
@@ -697,6 +872,423 @@ export function createApp() {
       res.status(204).end();
     } catch (error) {
       console.error("[tracks] Erreur de suppression", error);
+      next(error);
+    }
+  });
+
+  /*
+   * Amitiés. Une seule relation par couple d'utilisateurs (voir models/Friendship.js).
+   * L'utilisateur connecté est toujours celui du JWT (req.auth.sub) : il ne peut
+   * envoyer, lire, accepter ou refuser que les demandes qui le concernent.
+   */
+
+  /** Envoie une demande d'amitié à un utilisateur désigné par son email (ou son id). */
+  app.post("/api/friendships", auth, async (req, res, next) => {
+    try {
+      const me = req.auth.sub;
+      const { email, userId } = req.body || {};
+      let target;
+
+      if (userId !== undefined) {
+        if (!mongoose.isValidObjectId(userId)) {
+          console.warn(`[friends] Identifiant d'utilisateur invalide envoyé par ${me}`);
+          return res.status(400).json({ message: "Identifiant d'utilisateur invalide" });
+        }
+        target = await User.findById(userId);
+      } else if (typeof email === "string" && email.trim()) {
+        target = await User.findOne({ email: email.trim().toLowerCase() });
+      } else {
+        console.warn(`[friends] Demande sans destinataire envoyée par ${me}`);
+        return res.status(400).json({ message: "Email de l'utilisateur requis" });
+      }
+
+      if (!target) {
+        console.warn(`[friends] Destinataire inconnu pour la demande de ${me}`);
+        return res.status(404).json({ message: "Aucun utilisateur avec cet email" });
+      }
+      if (target.id === me) {
+        console.warn(`[friends] ${me} a tenté de s'envoyer une demande`);
+        return res.status(400).json({ message: "Vous ne pouvez pas vous envoyer une demande d'amitié" });
+      }
+
+      // Vérifie la relation existante, dans un sens comme dans l'autre (couple ordonné).
+      let friendship = await Friendship.findOne(orderedPair(me, target.id));
+      if (friendship?.status === "ACCEPTED") {
+        console.warn(`[friends] ${me} et ${target.id} sont déjà amis`);
+        return res.status(409).json({ message: "Vous êtes déjà amis" });
+      }
+      if (friendship?.status === "PENDING") {
+        const sentByMe = String(friendship.requestedBy) === me;
+        console.warn(`[friends] Demande déjà en attente entre ${me} et ${target.id}`);
+        return res.status(409).json({
+          message: sentByMe
+            ? "Demande déjà envoyée, en attente de réponse"
+            : "Cet utilisateur vous a déjà envoyé une demande : répondez-y depuis vos notifications",
+        });
+      }
+
+      if (friendship) {
+        // Demande refusée auparavant : elle peut être renvoyée, la relation est réutilisée.
+        friendship.status = "PENDING";
+        friendship.requestedBy = me;
+        await friendship.save();
+        console.log(`[friends] Demande renvoyée : ${friendship.id} (${me} -> ${target.id})`);
+      } else {
+        friendship = await Friendship.create({ user1Id: me, user2Id: target.id, requestedBy: me });
+        console.log(`[friends] Demande créée : ${friendship.id} (${me} -> ${target.id})`);
+      }
+
+      res.status(201).json(friendship.toPublicFor(me, new Map([[target.id, target]])));
+    } catch (error) {
+      // Deux demandes simultanées pour le même couple : l'index unique refuse la seconde.
+      if (error?.code === 11000) {
+        console.warn("[friends] Relation déjà créée par une requête simultanée", error);
+        return res.status(409).json({ message: "Une relation existe déjà avec cet utilisateur" });
+      }
+      console.error("[friends] Erreur d'envoi de la demande", error);
+      next(error);
+    }
+  });
+
+  /** Demandes reçues en attente (celles affichées dans les notifications). */
+  app.get("/api/friendships/received", auth, async (req, res, next) => {
+    try {
+      const me = req.auth.sub;
+      const friendships = await Friendship.find({
+        ...Friendship.involving(me),
+        status: "PENDING",
+        requestedBy: { $ne: me },
+      }).sort({ createdAt: -1 });
+      console.log(`[friends] ${friendships.length} demande(s) reçue(s) pour ${me}`);
+      res.json(await publicFriendships(friendships, me));
+    } catch (error) {
+      console.error("[friends] Erreur de lecture des demandes reçues", error);
+      next(error);
+    }
+  });
+
+  /** Demandes envoyées par l'utilisateur et toujours en attente. */
+  app.get("/api/friendships/sent", auth, async (req, res, next) => {
+    try {
+      const me = req.auth.sub;
+      const friendships = await Friendship.find({ requestedBy: me, status: "PENDING" }).sort({ createdAt: -1 });
+      console.log(`[friends] ${friendships.length} demande(s) envoyée(s) par ${me}`);
+      res.json(await publicFriendships(friendships, me));
+    } catch (error) {
+      console.error("[friends] Erreur de lecture des demandes envoyées", error);
+      next(error);
+    }
+  });
+
+  app.patch("/api/friendships/:id/accept", auth, (req, res, next) =>
+    answerFriendRequest(req, res, next, "ACCEPTED"),
+  );
+  app.patch("/api/friendships/:id/reject", auth, (req, res, next) =>
+    answerFriendRequest(req, res, next, "REJECTED"),
+  );
+
+  /** Liste des amis (relations acceptées) de l'utilisateur connecté. */
+  app.get("/api/friends", auth, async (req, res, next) => {
+    try {
+      const me = req.auth.sub;
+      const friendships = await Friendship.find({ ...Friendship.involving(me), status: "ACCEPTED" }).sort({
+        updatedAt: -1,
+      });
+      const friends = (await publicFriendships(friendships, me)).map((friendship) => ({
+        id: friendship.user.id,
+        name: friendship.user.name,
+        friendshipId: friendship.id,
+        since: friendship.updatedAt,
+      }));
+      console.log(`[friends] ${friends.length} ami(s) pour ${me}`);
+      res.json(friends);
+    } catch (error) {
+      console.error("[friends] Erreur de lecture de la liste d'amis", error);
+      next(error);
+    }
+  });
+
+  /*
+   * Playlists. Le propriétaire gère tout (nom, musiques, partage, suppression).
+   * Un ami invité (sharedWith + Friendship ACCEPTED) peut seulement consulter et
+   * écouter. Les droits sont vérifiés par findPlaylistFor() sur chaque route :id.
+   */
+
+  /** Playlists de l'utilisateur connecté. */
+  app.get("/api/playlists", auth, async (req, res, next) => {
+    try {
+      const me = req.auth.sub;
+      const playlists = await Playlist.find({ ownerId: me }).sort({ updatedAt: -1 });
+      console.log(`[playlists] ${playlists.length} playlist(s) pour ${me}`);
+      res.json(await publicPlaylists(playlists, me));
+    } catch (error) {
+      console.error("[playlists] Erreur de lecture des playlists", error);
+      next(error);
+    }
+  });
+
+  /** Crée une playlist, vide au départ. */
+  app.post("/api/playlists", auth, async (req, res, next) => {
+    try {
+      const me = req.auth.sub;
+      const { name, error } = parsePlaylistName(req.body?.name);
+      if (error) {
+        console.warn(`[playlists] Création refusée pour ${me} : ${error}`);
+        return res.status(400).json({ message: error });
+      }
+      const playlist = await Playlist.create({ ownerId: me, name });
+      console.log(`[playlists] Playlist créée : ${playlist.id} par ${me}`);
+      const [publicPlaylist] = await publicPlaylists([playlist], me, { withTracks: true });
+      res.status(201).json(publicPlaylist);
+    } catch (error) {
+      console.error("[playlists] Erreur de création de la playlist", error);
+      next(error);
+    }
+  });
+
+  /**
+   * Playlists partagées avec l'utilisateur connecté. Celles dont le propriétaire
+   * n'est plus son ami ne sont pas renvoyées (l'accès est perdu).
+   */
+  app.get("/api/playlists/shared", auth, async (req, res, next) => {
+    try {
+      const me = req.auth.sub;
+      const friendIds = await friendIdsOf(me);
+      const playlists = (await Playlist.find({ sharedWith: me }).sort({ updatedAt: -1 })).filter((playlist) =>
+        friendIds.has(String(playlist.ownerId)),
+      );
+      console.log(`[playlists] ${playlists.length} playlist(s) partagée(s) avec ${me}`);
+      res.json(await publicPlaylists(playlists, me));
+    } catch (error) {
+      console.error("[playlists] Erreur de lecture des playlists partagées", error);
+      next(error);
+    }
+  });
+
+  /** Contenu d'une playlist (propriétaire ou ami invité), pistes dans l'ordre de trackIds. */
+  app.get("/api/playlists/:id", auth, async (req, res, next) => {
+    try {
+      const access = await findPlaylistFor(req, res, { ownerOnly: false });
+      if (!access) return;
+      const [publicPlaylist] = await publicPlaylists([access.playlist], req.auth.sub, { withTracks: true });
+      console.log(`[playlists] Playlist ${access.playlist.id} envoyée à ${req.auth.sub}`);
+      res.json(publicPlaylist);
+    } catch (error) {
+      console.error("[playlists] Erreur de lecture de la playlist", error);
+      next(error);
+    }
+  });
+
+  /** Renomme une playlist (propriétaire seulement). */
+  app.patch("/api/playlists/:id", auth, async (req, res, next) => {
+    try {
+      const access = await findPlaylistFor(req, res, { ownerOnly: true });
+      if (!access) return;
+      const { name, error } = parsePlaylistName(req.body?.name);
+      if (error) {
+        console.warn(`[playlists] Nom refusé pour ${access.playlist.id} : ${error}`);
+        return res.status(400).json({ message: error });
+      }
+      access.playlist.name = name;
+      await access.playlist.save();
+      console.log(`[playlists] Playlist ${access.playlist.id} renommée`);
+      const [publicPlaylist] = await publicPlaylists([access.playlist], req.auth.sub, { withTracks: true });
+      res.json(publicPlaylist);
+    } catch (error) {
+      console.error("[playlists] Erreur de renommage de la playlist", error);
+      next(error);
+    }
+  });
+
+  /** Supprime une playlist. Les pistes et leurs fichiers audio ne sont pas touchés. */
+  app.delete("/api/playlists/:id", auth, async (req, res, next) => {
+    try {
+      const access = await findPlaylistFor(req, res, { ownerOnly: true });
+      if (!access) return;
+      await access.playlist.deleteOne();
+      console.log(`[playlists] Playlist ${access.playlist.id} supprimée (pistes conservées)`);
+      res.status(204).end();
+    } catch (error) {
+      console.error("[playlists] Erreur de suppression de la playlist", error);
+      next(error);
+    }
+  });
+
+  /** Ajoute une piste du propriétaire à la fin de la playlist, sans doublon. */
+  app.post("/api/playlists/:id/tracks", auth, async (req, res, next) => {
+    try {
+      const access = await findPlaylistFor(req, res, { ownerOnly: true });
+      if (!access) return;
+      const { trackId } = req.body || {};
+      if (!mongoose.isValidObjectId(trackId)) {
+        console.warn(`[playlists] Identifiant de piste invalide pour ${access.playlist.id}`);
+        return res.status(400).json({ message: "Identifiant de musique invalide" });
+      }
+      // La musique doit exister et appartenir au propriétaire de la playlist.
+      if (!(await Track.exists({ _id: trackId, ownerId: req.auth.sub }))) {
+        console.warn(`[playlists] Piste ${trackId} inconnue pour ${req.auth.sub}`);
+        return res.status(404).json({ message: "Musique inconnue" });
+      }
+      // Condition « pas encore présente » + $push dans la même requête : pas de doublon possible.
+      const updated = await Playlist.findOneAndUpdate(
+        { _id: access.playlist._id, trackIds: { $ne: trackId } },
+        { $push: { trackIds: trackId } },
+        { new: true },
+      );
+      if (!updated) {
+        console.warn(`[playlists] Piste ${trackId} déjà dans ${access.playlist.id}`);
+        return res.status(409).json({ message: "Cette musique est déjà dans la playlist" });
+      }
+      console.log(`[playlists] Piste ${trackId} ajoutée à ${updated.id}`);
+      const [publicPlaylist] = await publicPlaylists([updated], req.auth.sub, { withTracks: true });
+      res.status(201).json(publicPlaylist);
+    } catch (error) {
+      console.error("[playlists] Erreur d'ajout d'une musique", error);
+      next(error);
+    }
+  });
+
+  /** Retire une piste de la playlist (la piste elle-même n'est pas supprimée). */
+  app.delete("/api/playlists/:id/tracks/:trackId", auth, async (req, res, next) => {
+    try {
+      const access = await findPlaylistFor(req, res, { ownerOnly: true });
+      if (!access) return;
+      const { trackId } = req.params;
+      if (!mongoose.isValidObjectId(trackId)) {
+        return res.status(400).json({ message: "Identifiant de musique invalide" });
+      }
+      const result = await Playlist.updateOne(
+        { _id: access.playlist._id, trackIds: trackId },
+        { $pull: { trackIds: trackId } },
+      );
+      if (!result.modifiedCount) {
+        console.warn(`[playlists] Piste ${trackId} absente de ${access.playlist.id}`);
+        return res.status(404).json({ message: "Cette musique n'est pas dans la playlist" });
+      }
+      console.log(`[playlists] Piste ${trackId} retirée de ${access.playlist.id}`);
+      res.status(204).end();
+    } catch (error) {
+      console.error("[playlists] Erreur de retrait d'une musique", error);
+      next(error);
+    }
+  });
+
+  /** Fichier audio ou pochette d'une piste de la playlist, pour le propriétaire et les amis invités. */
+  app.get("/api/playlists/:id/tracks/:trackId/:file", auth, async (req, res, next) => {
+    try {
+      const { trackId, file } = req.params;
+      // Express 5 n'accepte plus de motif dans le chemin : seuls « audio » et « cover » existent.
+      if (!["audio", "cover"].includes(file)) {
+        return res.status(404).json({ message: "Ressource inconnue" });
+      }
+      const access = await findPlaylistFor(req, res, { ownerOnly: false });
+      if (!access) return;
+      const inPlaylist = access.playlist.trackIds.some((id) => String(id) === trackId);
+      const track = inPlaylist
+        ? await Track.findOne({ _id: trackId, ownerId: access.playlist.ownerId }).select(
+            "+storedName +coverStoredName",
+          )
+        : null;
+      const storedName = file === "audio" ? track?.storedName : track?.coverStoredName;
+      if (!storedName) {
+        console.warn(`[playlists] ${file} de ${trackId} indisponible dans ${access.playlist.id}`);
+        return res.status(404).json({ message: file === "audio" ? "Piste inconnue" : "Couverture inconnue" });
+      }
+
+      res.type(file === "audio" ? track.mimeType : track.coverMimeType);
+      res.sendFile(path.join(UPLOADS, storedName), (error) => {
+        if (error) {
+          console.error(`[playlists] Erreur d'envoi (${file}) de ${track.id}`, error);
+          if (!res.headersSent) next(error);
+          return;
+        }
+        console.log(`[playlists] ${file} de ${track.id} envoyé pour ${access.playlist.id}`);
+      });
+    } catch (error) {
+      console.error("[playlists] Erreur de préparation du fichier", error);
+      next(error);
+    }
+  });
+
+  /**
+   * Amis ayant accès à la playlist (propriétaire seulement). Les utilisateurs
+   * qui ne sont plus amis sont retirés de sharedWith à cette occasion.
+   */
+  app.get("/api/playlists/:id/shares", auth, async (req, res, next) => {
+    try {
+      const access = await findPlaylistFor(req, res, { ownerOnly: true });
+      if (!access) return;
+      const { playlist } = access;
+      const friendIds = await friendIdsOf(req.auth.sub);
+      const formerFriends = playlist.sharedWith.filter((id) => !friendIds.has(String(id)));
+      if (formerFriends.length) {
+        await Playlist.updateOne({ _id: playlist._id }, { $pull: { sharedWith: { $in: formerFriends } } });
+        console.log(`[playlists] ${formerFriends.length} ancien(s) ami(s) retiré(s) du partage de ${playlist.id}`);
+      }
+      const users = await User.find({
+        _id: { $in: playlist.sharedWith.filter((id) => friendIds.has(String(id))) },
+      }).select("name");
+      res.json(users.map((user) => ({ id: user.id, name: user.name })));
+    } catch (error) {
+      console.error("[playlists] Erreur de lecture du partage", error);
+      next(error);
+    }
+  });
+
+  /** Partage la playlist avec un ou plusieurs amis : { userIds: [...] }. */
+  app.post("/api/playlists/:id/shares", auth, async (req, res, next) => {
+    try {
+      const access = await findPlaylistFor(req, res, { ownerOnly: true });
+      if (!access) return;
+      const me = req.auth.sub;
+      const raw = req.body?.userIds;
+      if (!Array.isArray(raw) || !raw.length || !raw.every((id) => mongoose.isValidObjectId(id))) {
+        console.warn(`[playlists] Partage refusé : userIds invalide pour ${access.playlist.id}`);
+        return res.status(400).json({ message: "Liste d'amis invalide" });
+      }
+      const userIds = [...new Set(raw.map(String))];
+      if (userIds.includes(me)) {
+        console.warn(`[playlists] ${me} a tenté de partager ${access.playlist.id} avec lui-même`);
+        return res.status(400).json({ message: "Impossible de partager une playlist avec soi-même" });
+      }
+      const friendIds = await friendIdsOf(me);
+      if (!userIds.every((id) => friendIds.has(id))) {
+        console.warn(`[playlists] Partage de ${access.playlist.id} refusé : destinataire non ami`);
+        return res.status(400).json({ message: "Le partage est réservé à vos amis" });
+      }
+      // $addToSet : un ami déjà présent n'est pas ajouté une deuxième fois.
+      await Playlist.updateOne({ _id: access.playlist._id }, { $addToSet: { sharedWith: { $each: userIds } } });
+      console.log(`[playlists] Playlist ${access.playlist.id} partagée avec ${userIds.length} ami(s)`);
+      const playlist = await Playlist.findById(access.playlist._id);
+      const users = await User.find({ _id: { $in: playlist.sharedWith } }).select("name");
+      res.json(users.map((user) => ({ id: user.id, name: user.name })));
+    } catch (error) {
+      console.error("[playlists] Erreur de partage de la playlist", error);
+      next(error);
+    }
+  });
+
+  /** Retire l'accès d'un utilisateur à la playlist. */
+  app.delete("/api/playlists/:id/shares/:userId", auth, async (req, res, next) => {
+    try {
+      const access = await findPlaylistFor(req, res, { ownerOnly: true });
+      if (!access) return;
+      const { userId } = req.params;
+      if (!mongoose.isValidObjectId(userId)) {
+        return res.status(400).json({ message: "Identifiant d'utilisateur invalide" });
+      }
+      const result = await Playlist.updateOne(
+        { _id: access.playlist._id, sharedWith: userId },
+        { $pull: { sharedWith: userId } },
+      );
+      if (!result.modifiedCount) {
+        console.warn(`[playlists] ${userId} n'a pas accès à ${access.playlist.id}`);
+        return res.status(404).json({ message: "Cet utilisateur n'a pas accès à la playlist" });
+      }
+      console.log(`[playlists] Accès de ${userId} retiré de ${access.playlist.id}`);
+      res.status(204).end();
+    } catch (error) {
+      console.error("[playlists] Erreur de retrait d'un accès", error);
       next(error);
     }
   });

@@ -55,11 +55,11 @@
           [disabled]="disabled()"
           (click)="toggle(category)"
         >
-          <span class="tile-image">
+          <span class="tile-image thumb">
             @if (hasImage(category)) {
               <img [src]="category.image.url" [alt]="category.image.alt" loading="lazy" (error)="imageFailed(category)" />
             } @else {
-              <span class="tile-placeholder" aria-hidden="true">{{ initials(category) }}</span>
+              <span class="tile-placeholder thumb-placeholder" aria-hidden="true">{{ initials(category) }}</span>
             }
             @if (isSelected(category)) {
               <span class="tile-check" aria-hidden="true">✓</span>

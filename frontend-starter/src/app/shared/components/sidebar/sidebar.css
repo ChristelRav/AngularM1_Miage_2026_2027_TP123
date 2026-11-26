@@ -1,0 +1,154 @@
+/*
+ * Three layouts:
+ * - wide screens: full sidebar (section titles + labels), sticky under the top bar;
+ * - medium screens (≤ 1100px): narrow icon rail, labels kept for screen readers and as tooltips;
+ * - phones (≤ 720px): horizontal scrolling bar under the top bar, sections separated by a line.
+ */
+:host {
+  position: sticky;
+  top: var(--topbar-height, 4rem);
+  z-index: 5;
+  display: block;
+  flex-shrink: 0;
+  width: 15rem;
+  height: calc(100vh - var(--topbar-height, 4rem));
+  overflow-y: auto;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border-right: 1px solid var(--card-border);
+  backdrop-filter: blur(10px);
+}
+
+.sidebar { display: grid; gap: 1.4rem; padding: 1.5rem 0.85rem; }
+
+.section-title {
+  margin: 0 0 0.45rem;
+  padding: 0 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.links { display: grid; gap: 0.15rem; margin: 0; padding: 0; list-style: none; }
+
+.link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: var(--text);
+  text-decoration: none;
+  border-radius: 10px;
+  transition: background 0.15s, color 0.15s;
+}
+.link:hover { color: var(--text); background: var(--surface-hover); }
+.link:focus-visible { outline: 2px solid var(--primary-fg); outline-offset: 1px; }
+
+.link-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  font-size: 1.05rem;
+  color: var(--muted);
+  border-radius: 8px;
+  transition: background 0.15s, color 0.15s;
+}
+.link-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Active page: tinted background, colored icon tile and a gold marker on the left. */
+.link.active { font-weight: 700; color: var(--primary-soft-fg); background: var(--primary-soft); }
+.link.active .link-icon { color: white; background: var(--primary); }
+.link.active::before {
+  content: '';
+  position: absolute;
+  top: 0.55rem;
+  bottom: 0.55rem;
+  left: -0.85rem;
+  width: 4px;
+  background: var(--accent);
+  border-radius: 0 4px 4px 0;
+}
+
+.soon {
+  padding: 0.05rem 0.4rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--primary-soft);
+  border-radius: 999px;
+}
+.link.active .soon { color: var(--primary-soft-fg); background: var(--surface); }
+
+/* ---------- Medium screens: icon rail ---------- */
+@media (max-width: 1100px) {
+  :host { width: 4.75rem; }
+  .sidebar { gap: 0.6rem; padding: 1rem 0.6rem; }
+  /* The section title becomes a thin separator; its text stays available to screen readers. */
+  .section-title {
+    height: 1px;
+    margin: 0 0.5rem 0.6rem;
+    padding: 0;
+    overflow: hidden;
+    font-size: 0;
+    background: var(--line);
+  }
+  .section:first-child .section-title { background: transparent; margin-bottom: 0; }
+  .link { justify-content: center; padding: 0.4rem; }
+  .link.active::before { left: -0.6rem; }
+  .link-label,
+  .soon {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .link-icon { width: 2.4rem; height: 2.4rem; font-size: 1.15rem; }
+}
+
+/* ---------- Phones: horizontal bar under the top bar ---------- */
+@media (max-width: 720px) {
+  :host {
+    width: auto;
+    height: auto;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: 0;
+    border-bottom: 1px solid var(--card-border);
+    scrollbar-width: none;
+  }
+  :host::-webkit-scrollbar { display: none; }
+  .sidebar { display: flex; gap: 0; width: max-content; padding: 0.4rem 0.6rem; }
+  .section { display: flex; align-items: center; }
+  .section + .section { margin-left: 0.4rem; padding-left: 0.4rem; border-left: 1px solid var(--line); }
+  .section-title,
+  .section:first-child .section-title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    background: none;
+    clip-path: inset(50%);
+  }
+  .links { display: flex; gap: 0.15rem; }
+  .link { flex-direction: column; gap: 0.1rem; padding: 0.3rem 0.5rem; }
+  .link.active::before { top: auto; bottom: -0.4rem; left: 25%; width: 50%; height: 3px; border-radius: 3px 3px 0 0; }
+  .link-icon { width: 2rem; height: 2rem; font-size: 1rem; }
+  /* Short labels come back under the icons on phones. */
+  .link-label {
+    position: static;
+    width: auto;
+    height: auto;
+    clip-path: none;
+    font-size: 0.68rem;
+  }
+}

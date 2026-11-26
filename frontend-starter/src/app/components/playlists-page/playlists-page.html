@@ -1,0 +1,115 @@
+<section>
+  <div class="hero">
+    <p class="eyebrow">BIBLIOTHÈQUE</p>
+    <h1>Playlists</h1>
+    <p>Regroupez vos backing tracks par session de travail et partagez-les avec vos amis.</p>
+  </div>
+
+  <article class="card">
+    <div class="row">
+      <div class="card-header">
+        <span class="card-icon"><app-icon name="list-music" /></span>
+        <h2>Mes playlists</h2>
+      </div>
+      <button type="button" class="create" (click)="create()"><app-icon name="list-music" />Créer une playlist</button>
+    </div>
+
+    @if (errorMine(); as message) {
+      <p class="error" role="alert">
+        <app-icon name="alert" />{{ message }}
+        <button type="button" class="btn-ghost retry" (click)="loadMine()">Réessayer</button>
+      </p>
+    } @else if (loadingMine()) {
+      <p class="muted">Chargement…</p>
+    } @else {
+      <ul class="playlist-grid" aria-label="Mes playlists">
+        @for (playlist of mine(); track playlist.id) {
+          <li>
+            <ng-container *ngTemplateOutlet="card; context: { $implicit: playlist }" />
+          </li>
+        } @empty {
+          <li class="empty">
+            Vous n’avez pas encore de playlist.
+            <button type="button" class="btn-ghost" (click)="create()">Créer ma première playlist</button>
+          </li>
+        }
+      </ul>
+    }
+  </article>
+
+  <article class="card shared-card">
+    <div class="card-header">
+      <span class="card-icon"><app-icon name="users" /></span>
+      <h2>Partagées avec moi</h2>
+    </div>
+    <p class="subtitle">Les playlists que vos amis partagent avec vous : vous pouvez les écouter, pas les modifier.</p>
+
+    @if (errorShared(); as message) {
+      <p class="error" role="alert">
+        <app-icon name="alert" />{{ message }}
+        <button type="button" class="btn-ghost retry" (click)="loadShared()">Réessayer</button>
+      </p>
+    } @else if (loadingShared()) {
+      <p class="muted">Chargement…</p>
+    } @else {
+      <ul class="playlist-grid" aria-label="Playlists partagées avec moi">
+        @for (playlist of shared(); track playlist.id) {
+          <li>
+            <ng-container *ngTemplateOutlet="card; context: { $implicit: playlist }" />
+          </li>
+        } @empty {
+          <li class="empty">Aucun ami n’a encore partagé de playlist avec vous.</li>
+        }
+      </ul>
+    }
+  </article>
+</section>
+
+<!-- One card for both sections: the ⋯ menu only exists on the user's own playlists. -->
+<ng-template #card let-playlist>
+  <article class="playlist-card" [attr.aria-labelledby]="'playlist-' + playlist.id">
+    <div class="cover-wrap">
+      <a class="cover-link" [routerLink]="['/playlists', playlist.id]" tabindex="-1" aria-hidden="true">
+        <app-playlist-cover [covers]="playlist.covers" [name]="playlist.name" />
+      </a>
+      <button
+        type="button"
+        class="btn-icon play"
+        (click)="play(playlist)"
+        [disabled]="!playlist.trackCount"
+        [attr.aria-label]="'Écouter ' + playlist.name"
+        [attr.title]="playlist.trackCount ? 'Écouter' : 'Playlist vide'"
+      >
+        <app-icon name="play" />
+      </button>
+    </div>
+    <div class="playlist-text">
+      <a class="playlist-name" [id]="'playlist-' + playlist.id" [routerLink]="['/playlists', playlist.id]" [title]="playlist.name">
+        {{ playlist.name }}
+      </a>
+      <small>
+        {{ playlist.trackCount }} musique{{ playlist.trackCount > 1 ? 's' : '' }}
+        @if (playlist.isOwner) {
+          @if (playlist.sharedWithCount) {
+            · partagée avec {{ playlist.sharedWithCount }} ami{{ playlist.sharedWithCount > 1 ? 's' : '' }}
+          }
+        } @else {
+          · par {{ playlist.owner.name }}
+        }
+      </small>
+    </div>
+    @if (playlist.isOwner) {
+      <button
+        type="button"
+        class="btn-icon menu-toggle"
+        [matMenuTriggerFor]="menu"
+        [attr.aria-label]="'Actions pour ' + playlist.name"
+      >•••</button>
+      <mat-menu #menu="matMenu" xPosition="before">
+        <button mat-menu-item type="button" (click)="rename(playlist)"><app-icon name="save" />Modifier le nom</button>
+        <button mat-menu-item type="button" (click)="share(playlist)"><app-icon name="users" />Partager</button>
+        <button mat-menu-item type="button" class="danger" (click)="remove(playlist)"><app-icon name="trash" />Supprimer</button>
+      </mat-menu>
+    }
+  </article>
+</ng-template>

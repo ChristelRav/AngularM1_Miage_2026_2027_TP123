@@ -1,0 +1,111 @@
+<section>
+  <a class="back" routerLink="/playlists"><app-icon name="chevron-left" />Playlists</a>
+
+  @if (loading()) {
+    <p class="muted">Chargement…</p>
+  } @else if (error(); as message) {
+    <article class="card">
+      <p class="error" role="alert"><app-icon name="alert" />{{ message }}</p>
+      <p class="muted">Cette playlist n’existe plus, ou elle n’est plus partagée avec vous.</p>
+      <a routerLink="/playlists">Revenir aux playlists</a>
+    </article>
+  } @else if (playlist(); as playlist) {
+    <header class="hero playlist-hero">
+      <app-playlist-cover class="hero-cover" [covers]="playlist.covers" [name]="playlist.name" />
+      <div class="hero-text">
+        <p class="eyebrow">
+          @if (playlist.isOwner) {
+            PLAYLIST
+          } @else {
+            PLAYLIST PARTAGÉE PAR {{ playlist.owner.name.toUpperCase() }}
+          }
+        </p>
+        <h1>{{ playlist.name }}</h1>
+        <p>
+          {{ playlist.trackCount }} musique{{ playlist.trackCount > 1 ? 's' : '' }}
+          @if (playlist.isOwner && playlist.sharedWithCount) {
+            · partagée avec {{ playlist.sharedWithCount }} ami{{ playlist.sharedWithCount > 1 ? 's' : '' }}
+          }
+        </p>
+        <div class="hero-actions">
+          <button type="button" class="listen" (click)="playAt(0)" [disabled]="!tracks().length">
+            <app-icon name="play" />Écouter
+          </button>
+          @if (playlist.isOwner) {
+            <button type="button" class="hero-ghost" (click)="addTracks(playlist)"><app-icon name="music" />Ajouter des musiques</button>
+            <button type="button" class="hero-ghost" (click)="share(playlist)"><app-icon name="users" />Partager</button>
+            <button type="button" class="btn-icon hero-ghost" [matMenuTriggerFor]="menu" aria-label="Autres actions">•••</button>
+            <mat-menu #menu="matMenu" xPosition="before">
+              <button mat-menu-item type="button" (click)="rename(playlist)"><app-icon name="save" />Modifier le nom</button>
+              <button mat-menu-item type="button" class="danger" (click)="remove(playlist)"><app-icon name="trash" />Supprimer</button>
+            </mat-menu>
+          }
+        </div>
+      </div>
+    </header>
+
+    @if (current(); as track) {
+      <article class="card now-playing" aria-live="polite">
+        <div class="now-head">
+          <span class="now-text">
+            <small>En lecture · {{ (currentIndex() ?? 0) + 1 }} / {{ tracks().length }}</small>
+            <b [title]="track.title">{{ track.title }}</b>
+          </span>
+          <button type="button" class="btn-icon btn-ghost" (click)="previous()" [disabled]="!hasPrevious()" aria-label="Musique précédente">
+            <app-icon name="chevron-left" />
+          </button>
+          <button type="button" class="btn-icon btn-ghost" (click)="next()" [disabled]="!hasNext()" aria-label="Musique suivante">
+            <app-icon name="chevron-right" />
+          </button>
+        </div>
+        <!-- The existing player: same audio graph, so the MilkDrop background follows the playlist too. -->
+        <app-track-player [src]="audioUrl()" [label]="track.title" (ended)="next()" />
+      </article>
+    }
+
+    <article class="card">
+      <ol class="track-list" aria-label="Musiques de la playlist">
+        @for (track of tracks(); track track.id; let i = $index) {
+          <li class="track-row" [class.playing]="currentIndex() === i">
+            <span class="track-number" aria-hidden="true">{{ i + 1 }}</span>
+            <app-playlist-cover class="track-cover" [covers]="track.coverUrl ? [track.coverUrl] : []" [name]="track.title" />
+            <span class="track-text">
+              <b [title]="track.title">{{ track.title }}</b>
+              <small><span class="badge">{{ track.mimeType | audioFormat }}</span></small>
+            </span>
+            <button
+              type="button"
+              class="btn-icon"
+              [class.btn-ghost]="currentIndex() !== i"
+              (click)="playAt(i)"
+              [disabled]="loadingTrack()"
+              [attr.aria-label]="'Lire ' + track.title"
+            >
+              <app-icon name="play" />
+            </button>
+            @if (playlist.isOwner) {
+              <button
+                type="button"
+                class="btn-icon btn-danger-ghost"
+                (click)="removeTrack(playlist, track, i)"
+                [attr.aria-label]="'Retirer ' + track.title + ' de la playlist'"
+                title="Retirer de la playlist"
+              >
+                <app-icon name="x" />
+              </button>
+            }
+          </li>
+        } @empty {
+          <li class="empty">
+            @if (playlist.isOwner) {
+              Cette playlist est vide.
+              <button type="button" class="btn-ghost" (click)="addTracks(playlist)"><app-icon name="music" />Ajouter des musiques</button>
+            } @else {
+              Cette playlist est vide pour le moment.
+            }
+          </li>
+        }
+      </ol>
+    </article>
+  }
+</section>

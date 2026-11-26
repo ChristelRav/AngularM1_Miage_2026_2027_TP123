@@ -1,0 +1,22 @@
+<form (submit)="$event.preventDefault(); submit()">
+  <h2 mat-dialog-title>{{ data.title }}</h2>
+  <mat-dialog-content>
+    <label>
+      Nom de la playlist
+      <input
+        [formControl]="name"
+        [attr.maxlength]="max"
+        placeholder="Mes favoris"
+        cdkFocusInitial
+        [attr.aria-invalid]="name.touched && name.invalid"
+      />
+    </label>
+    @if (name.touched && name.invalid) {
+      <p class="field-error">Saisissez un nom (au plus {{ max }} caractères).</p>
+    }
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button type="button" class="btn-ghost" mat-dialog-close>Annuler</button>
+    <button type="submit">{{ data.confirmLabel }}</button>
+  </mat-dialog-actions>
+</form>

@@ -108,6 +108,11 @@
 .tile,
 .tile:hover:not(:disabled) {
   display: grid;
+  /* One full-width column: without it the column follows the length of the name, so
+     every thumbnail had a different size. */
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  align-content: start;
   gap: 0.3rem;
   justify-items: center;
   width: 100%;
@@ -126,27 +131,16 @@
   border-color: var(--cat-color);
 }
 
-.tile-image {
-  position: relative;
-  display: block;
-  width: 100%;
-  aspect-ratio: 1;
-  overflow: hidden;
-  border-radius: 7px;
-}
-.tile-image img { width: 100%; height: 100%; object-fit: cover; }
-.tile-placeholder {
-  display: grid;
-  place-items: center;
-  height: 100%;
+/* Square frame shared by images and placeholders: see `.thumb` in styles.css. */
+.tile-image { --thumb-radius: 7px; }
+.tile-image > .tile-placeholder {
   font-size: 1.1rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
   color: white;
   background: linear-gradient(135deg, var(--cat-color), color-mix(in srgb, var(--cat-color) 45%, #0b1f3a));
 }
 .tile-check {
   position: absolute;
+  z-index: 1;
   top: 0.25rem;
   right: 0.25rem;
   display: grid;
@@ -165,6 +159,8 @@
   font-size: 0.74rem;
   font-weight: 600;
   line-height: 1.2;
+  /* Always two lines high: one-line and two-line names give tiles of the same height. */
+  min-height: 2.4em;
   text-align: center;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;

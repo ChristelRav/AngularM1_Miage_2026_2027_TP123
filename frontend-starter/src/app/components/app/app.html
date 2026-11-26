@@ -1,5 +1,5 @@
 <header class="topbar">
-  <a class="brand" routerLink="/tracks">
+  <a class="brand" routerLink="/dashboard">
     <span class="brand-logo"><app-icon name="headphones" /></span>
     <span class="brand-text">
       <b>Guitar Practice Cloud</b>
@@ -8,9 +8,9 @@
   </a>
 
   <nav aria-label="Navigation principale">
-    <a class="nav-link" routerLink="/tracks" routerLinkActive="active" ariaCurrentWhenActive="page">
-      <app-icon name="music" /><span class="nav-label">Backing tracks</span>
-    </a>
+    @if (auth.isAuthenticated()) {
+      <app-notification-bell />
+    }
     <a class="nav-link" routerLink="/profile" routerLinkActive="active" ariaCurrentWhenActive="page">
       <app-icon name="user" /><span class="nav-label">Profil</span>
     </a>
@@ -50,9 +50,15 @@
   </nav>
 </header>
 
-<main>
-  <router-outlet />
-</main>
+<!-- Signed in: sidebar menu (Accueil, Bibliothèque, Outils) next to the page. -->
+<div class="shell" [class.with-sidebar]="auth.isAuthenticated()">
+  @if (auth.isAuthenticated()) {
+    <app-sidebar />
+  }
+  <main>
+    <router-outlet />
+  </main>
+</div>
 
 <!-- Animated MilkDrop background, behind the whole page. -->
 <app-visualizer-background />

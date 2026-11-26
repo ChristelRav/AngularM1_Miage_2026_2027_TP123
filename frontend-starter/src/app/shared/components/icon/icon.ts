@@ -19,7 +19,24 @@ export type IconName =
   | 'sun'
   | 'moon'
   | 'sparkles'
-  | 'tag';
+  | 'tag'
+  | 'compass'
+  | 'layout-dashboard'
+  | 'list-music'
+  | 'disc'
+  | 'audio-waveform'
+  | 'flask'
+  | 'globe'
+  | 'users'
+  | 'clock'
+  | 'arrow-right'
+  | 'timer'
+  | 'gauge'
+  | 'repeat'
+  | 'bell'
+  | 'check'
+  | 'x'
+  | 'send';
 
 /** Inline stroke icon that inherits the surrounding text color and size. */
 @Component({
@@ -106,6 +123,78 @@ export type IconName =
         @case ('sparkles') {
           <path d="M11 3l1.9 5.1L18 10l-5.1 1.9L11 17l-1.9-5.1L4 10l5.1-1.9Z" />
           <path d="M19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8Z" />
+        }
+        @case ('compass') {
+          <path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z" />
+          <circle cx="12" cy="12" r="10" />
+        }
+        @case ('layout-dashboard') {
+          <rect width="7" height="9" x="3" y="3" rx="1" />
+          <rect width="7" height="5" x="14" y="3" rx="1" />
+          <rect width="7" height="9" x="14" y="12" rx="1" />
+          <rect width="7" height="5" x="3" y="16" rx="1" />
+        }
+        @case ('list-music') {
+          <path d="M21 15V6" />
+          <path d="M18.5 18a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />
+          <path d="M12 12H3M16 6H3M12 18H3" />
+        }
+        @case ('disc') {
+          <circle cx="12" cy="12" r="10" />
+          <path d="M6 12c0-1.7.7-3.2 1.8-4.2" />
+          <circle cx="12" cy="12" r="2" />
+          <path d="M18 12c0 1.7-.7 3.2-1.8 4.2" />
+        }
+        @case ('audio-waveform') {
+          <path d="M2 13a2 2 0 0 0 2-2V7a2 2 0 0 1 4 0v13a2 2 0 0 0 4 0V4a2 2 0 0 1 4 0v13a2 2 0 0 0 4 0v-4a2 2 0 0 1 2-2" />
+        }
+        @case ('flask') {
+          <path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2" />
+          <path d="M6.453 15h11.094M8.5 2h7" />
+        }
+        @case ('globe') {
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20M2 12h20" />
+        }
+        @case ('users') {
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+        }
+        @case ('clock') {
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 6v6l4 2" />
+        }
+        @case ('arrow-right') {
+          <path d="M5 12h14M12 5l7 7-7 7" />
+        }
+        @case ('timer') {
+          <path d="M10 2h4M12 14l3-3" />
+          <circle cx="12" cy="14" r="8" />
+        }
+        @case ('gauge') {
+          <path d="m12 14 4-4" />
+          <path d="M3.34 19a10 10 0 1 1 17.32 0" />
+        }
+        @case ('repeat') {
+          <path d="m17 2 4 4-4 4" />
+          <path d="M3 11v-1a4 4 0 0 1 4-4h14" />
+          <path d="m7 22-4-4 4-4" />
+          <path d="M21 13v1a4 4 0 0 1-4 4H3" />
+        }
+        @case ('bell') {
+          <path d="M10.268 21a2 2 0 0 0 3.464 0" />
+          <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" />
+        }
+        @case ('check') {
+          <path d="M20 6 9 17l-5-5" />
+        }
+        @case ('x') {
+          <path d="M18 6 6 18M6 6l12 12" />
+        }
+        @case ('send') {
+          <path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" />
+          <path d="m21.854 2.147-10.94 10.939" />
         }
         @case ('alert') {
           <circle cx="12" cy="12" r="10" />

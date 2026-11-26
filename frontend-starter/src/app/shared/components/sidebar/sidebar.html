@@ -1,0 +1,26 @@
+<nav class="sidebar" aria-label="Menu de l’application">
+  @for (section of sections; track section.id) {
+    <div class="section" role="group" [attr.aria-labelledby]="'sidebar-' + section.id">
+      <h2 class="section-title" [id]="'sidebar-' + section.id">{{ section.title }}</h2>
+      <ul class="links">
+        @for (link of section.links; track link.path) {
+          <li>
+            <a
+              class="link"
+              [routerLink]="link.path"
+              routerLinkActive="active"
+              ariaCurrentWhenActive="page"
+              [attr.title]="link.label"
+            >
+              <span class="link-icon"><app-icon [name]="link.icon" /></span>
+              <span class="link-label">{{ link.label }}</span>
+              @if (link.soon) {
+                <span class="soon" aria-label="(en préparation)">Bientôt</span>
+              }
+            </a>
+          </li>
+        }
+      </ul>
+    </div>
+  }
+</nav>

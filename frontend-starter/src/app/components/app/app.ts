@@ -1,6 +1,8 @@
 import { Component, inject } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { IconComponent } from '../../shared/components/icon/icon';
+import { NotificationBellComponent } from '../../shared/components/notification-bell/notification-bell';
+import { SidebarComponent } from '../../shared/components/sidebar/sidebar';
 import { VisualizerBackgroundComponent } from '../../shared/components/visualizer-background/visualizer-background';
 import { AuthService } from '../../shared/services/auth.service';
 import { ThemeService } from '../../shared/services/theme.service';
@@ -8,7 +10,7 @@ import { VisualizerService } from '../../shared/services/visualizer.service';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterLink, RouterLinkActive, RouterOutlet, IconComponent, VisualizerBackgroundComponent],
+  imports: [RouterLink, RouterLinkActive, RouterOutlet, IconComponent, NotificationBellComponent, SidebarComponent, VisualizerBackgroundComponent],
   templateUrl: './app.html',
   styleUrl: './app.css',
 })

@@ -1,0 +1,40 @@
+<section>
+  <div class="hero">
+    <p class="eyebrow">OUTILS</p>
+    <h1>Music Lab</h1>
+    <p>Le laboratoire de Guitar Cloud : outils et expérimentations musicales.</p>
+  </div>
+
+  <article class="card">
+    <h2>Disponible</h2>
+    <ul class="lab-grid">
+      <li>
+        <a class="lab-card available" routerLink="/visualizer">
+          <span class="lab-icon"><app-icon name="audio-waveform" /></span>
+          <span class="lab-text">
+            <b>Visualiseur audio</b>
+            <small>Fond animé MilkDrop qui suit le rythme de vos morceaux.</small>
+          </span>
+          <app-icon class="lab-arrow" name="arrow-right" />
+        </a>
+      </li>
+    </ul>
+
+    <h2 class="soon-title">En préparation</h2>
+    <p class="hint">Ces outils ne sont pas encore développés : ils sont listés ici pour donner un aperçu du laboratoire.</p>
+    <ul class="lab-grid">
+      @for (idea of ideas; track idea.name) {
+        <li>
+          <div class="lab-card soon" aria-disabled="true">
+            <span class="lab-icon"><app-icon [name]="idea.icon" /></span>
+            <span class="lab-text">
+              <b>{{ idea.name }}</b>
+              <small>{{ idea.description }}</small>
+            </span>
+            <span class="badge-soon">Bientôt</span>
+          </div>
+        </li>
+      }
+    </ul>
+  </article>
+</section>

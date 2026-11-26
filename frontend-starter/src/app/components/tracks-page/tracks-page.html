@@ -103,11 +103,11 @@
                 [attr.aria-busy]="deletingIds().has(track.id)"
                 [attr.aria-labelledby]="'track-title-' + track.id"
               >
-                <div class="track-cover">
+                <div class="track-cover thumb">
                   @if (coverUrls()[track.id]) {
                     <img [src]="coverUrls()[track.id]" [alt]="'Couverture de ' + track.title" />
                   } @else {
-                    <span aria-hidden="true"><app-icon name="music" /></span>
+                    <span class="thumb-placeholder" aria-hidden="true"><app-icon name="music" /></span>
                   }
                 </div>
                 <div class="track-body">

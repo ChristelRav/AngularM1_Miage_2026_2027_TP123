@@ -1,0 +1,30 @@
+mat-dialog-actions { gap: 0.5rem; }
+
+.hint { margin: 0 0 0.75rem; color: var(--muted); }
+.error { margin: 0 0 0.75rem; }
+h3 { margin: 1rem 0 0.5rem; font-size: 0.9rem; color: var(--text); }
+
+.people { display: grid; gap: 0.4rem; margin: 0; padding: 0; list-style: none; }
+.people li { display: flex; align-items: center; gap: 0.7rem; }
+.people li:not(.empty) { padding: 0.45rem 0.6rem; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; }
+
+/* The whole row is clickable to (de)select a friend. */
+.pick { display: flex; flex: 1; align-items: center; gap: 0.7rem; margin: 0; font-weight: 400; cursor: pointer; }
+.pick input { width: 1.1rem; height: 1.1rem; accent-color: var(--primary); }
+
+.avatar {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 2.2rem;
+  height: 2.2rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--blue-900);
+  background: linear-gradient(135deg, var(--accent), #f0a85a);
+  border-radius: 50%;
+}
+.person-name { flex: 1; min-width: 0; overflow: hidden; color: var(--text); text-overflow: ellipsis; white-space: nowrap; }
+
+.small { gap: 0.3rem; padding: 0.35rem 0.6rem; font-size: 0.8rem; }
+.empty { margin: 0; padding: 0.5rem 0; font-size: 0.88rem; color: var(--muted); }

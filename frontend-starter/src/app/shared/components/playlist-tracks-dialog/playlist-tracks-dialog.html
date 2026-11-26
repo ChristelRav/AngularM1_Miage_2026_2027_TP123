@@ -1,0 +1,47 @@
+<h2 mat-dialog-title>Ajouter à « {{ data.playlist.name }} »</h2>
+<mat-dialog-content>
+  @if (error(); as message) {
+    <p class="error" role="alert"><app-icon name="alert" />{{ message }}</p>
+  }
+  @if (loading()) {
+    <p class="hint">Chargement…</p>
+  } @else {
+    <ul class="track-list" aria-label="Vos backing tracks">
+      @for (track of items(); track track.id) {
+        @let added = addedIds().has(track.id);
+        <li>
+          <span class="track-text">
+            <b [title]="track.title">{{ track.title }}</b>
+            <small>{{ track.mimeType | audioFormat }}</small>
+          </span>
+          <button
+            type="button"
+            class="small"
+            [class.btn-ghost]="added"
+            (click)="add(track)"
+            [disabled]="added || addingId() === track.id"
+            [attr.aria-label]="(added ? 'Déjà dans la playlist : ' : 'Ajouter ') + track.title"
+          >
+            <app-icon [name]="added ? 'check' : 'music'" />{{ added ? 'Ajoutée' : 'Ajouter' }}
+          </button>
+        </li>
+      } @empty {
+        <li class="hint">Vous n’avez encore importé aucune backing track.</li>
+      }
+    </ul>
+    @if (pages() > 1) {
+      <div class="pager">
+        <button type="button" class="btn-ghost small" (click)="go(page() - 1)" [disabled]="page() <= 1">
+          <app-icon name="chevron-left" />Précédent
+        </button>
+        <span>Page {{ page() }} / {{ pages() }}</span>
+        <button type="button" class="btn-ghost small" (click)="go(page() + 1)" [disabled]="page() >= pages()">
+          Suivant<app-icon name="chevron-right" />
+        </button>
+      </div>
+    }
+  }
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button type="button" [mat-dialog-close]="updated()">Terminé</button>
+</mat-dialog-actions>
