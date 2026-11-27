@@ -10,7 +10,6 @@ import { PlaylistsPageComponent } from './components/playlists-page/playlists-pa
 import { ProfilePageComponent } from './components/profile-page/profile-page';
 import { RegisterPageComponent } from './components/register-page/register-page';
 import { TracksPageComponent } from './components/tracks-page/tracks-page';
-import { VisualizerPageComponent } from './components/visualizer-page/visualizer-page';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
@@ -26,7 +25,7 @@ export const routes: Routes = [
   { path: 'playlists/:id', component: PlaylistPageComponent, canActivate: [authGuard] },
   { path: 'albums', component: AlbumsPageComponent, canActivate: [authGuard] },
   // Outils
-  { path: 'visualizer', component: VisualizerPageComponent, canActivate: [authGuard] },
+  //{ path: 'visualizer', component: VisualizerPageComponent, canActivate: [authGuard] },
   { path: 'music-lab', component: MusicLabPageComponent, canActivate: [authGuard] },
   { path: '**', redirectTo: 'dashboard' },
 ];
