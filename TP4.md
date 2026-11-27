@@ -2,7 +2,7 @@
 
 - API - import de donnée massif
 - Modification de look & field
-- privé et public - téléchargement
+- privé et public - téléchargement (Mila amboarina)
 - partage audio 
 - catégrie de audio
 - Egaliseur, tonacité de l'audio 
